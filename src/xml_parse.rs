@@ -66,6 +66,10 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                         String::new(),
                         Value::Unprotected(String::new()),
                     )),
+                    "UUID" => parsed_stack.push(Node::KeyValue(
+                        String::from("UUID"),
+                        Value::Unprotected(String::new()),
+                    )),
                     "Value" => {
                         // Are we encountering a protected value?
                         if attributes
@@ -101,6 +105,7 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                     "Group",
                     "Entry",
                     "String",
+                    "UUID",
                     "AutoType",
                     "Association",
                     "ExpiryTime",

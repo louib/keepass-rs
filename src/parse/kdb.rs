@@ -210,11 +210,17 @@ fn parse_entries(
         let field_size = LittleEndian::read_u32(&data[2..]);
         let field_value = &data[6..6 + field_size as usize];
 
+        panic!("The Field type is {}", field_type);
         match field_type {
             0x0000 => {} // KeePass ignores this field type
             0x0001 => {
                 // uuid
+                println!("The Uuid is {}", from_utf8(field_value).unwrap());
                 ensure_length(field_type, field_size, 16)?;
+                entry.fields.insert(
+                    String::from("Uuid"),
+                    Value::Unprotected(from_utf8(field_value)?),
+                );
             }
             0x0002 => {
                 // GroupId

@@ -369,6 +369,11 @@ impl<'a> Entry {
         self.get("Title")
     }
 
+    /// Convenience method for getting the value of the 'UUID' field
+    pub fn get_uuid(&'a self) -> Option<&'a str> {
+        self.get("UUID")
+    }
+
     /// Convenience method for getting the value of the 'UserName' field
     pub fn get_username(&'a self) -> Option<&'a str> {
         self.get("UserName")
