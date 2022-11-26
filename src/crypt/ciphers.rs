@@ -125,8 +125,8 @@ impl Cipher for Salsa20Cipher {
     where
         Self: Sized,
     {
-        // TODO
-        99
+        // or 16
+        32
     }
 }
 

@@ -96,6 +96,13 @@ impl InnerCipherSuite {
             InnerCipherSuite::ChaCha20 => CHA_CHA_20,
         }
     }
+    pub fn get_nonce_size(&self) -> u8 {
+        match self {
+            InnerCipherSuite::Plain => crypt::ciphers::PlainCipher::nonce_size(),
+            InnerCipherSuite::Salsa20 => crypt::ciphers::Salsa20Cipher::nonce_size(),
+            InnerCipherSuite::ChaCha20 => crypt::ciphers::ChaCha20Cipher::nonce_size(),
+        }
+    }
 }
 
 impl TryFrom<u32> for InnerCipherSuite {
