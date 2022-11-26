@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     pub fn kdbx4_with_kdf_argon2_cipher_chacha() {
-        let mut db = create_database(
+        test_with_settings(
             OuterCipherSuite::ChaCha20,
             Compression::GZip,
             InnerCipherSuite::ChaCha20,
@@ -143,35 +143,12 @@ mod tests {
                 seed: vec![],
                 rounds: 100,
             },
-            Group {
-                children: vec![Node::Entry(Entry {
-                    uuid: Uuid::new_v4().to_string(),
-                    fields: HashMap::default(),
-                    times: HashMap::default(),
-                    expires: false,
-                    autotype: None,
-                    tags: vec![],
-                })],
-                name: "Root".to_string(),
-                uuid: Uuid::new_v4().to_string(),
-                times: HashMap::default(),
-                expires: false,
-            },
         );
-
-        let password = "test".to_string();
-        let key_elements = key::get_key_elements(Some(&password), None).unwrap();
-
-        let encrypted_db = dump(&db, &key_elements).unwrap();
-
-        let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
-
-        assert_eq!(decrypted_db.root.children.len(), 1);
     }
 
     #[test]
     pub fn kdbx4_with_kdf_argon2_cipher_twofish() {
-        let mut db = create_database(
+        test_with_settings(
             OuterCipherSuite::Twofish,
             Compression::GZip,
             InnerCipherSuite::ChaCha20,
@@ -179,35 +156,12 @@ mod tests {
                 seed: vec![],
                 rounds: 100,
             },
-            Group {
-                children: vec![Node::Entry(Entry {
-                    uuid: Uuid::new_v4().to_string(),
-                    fields: HashMap::default(),
-                    times: HashMap::default(),
-                    expires: false,
-                    autotype: None,
-                    tags: vec![],
-                })],
-                name: "Root".to_string(),
-                uuid: Uuid::new_v4().to_string(),
-                times: HashMap::default(),
-                expires: false,
-            },
         );
-
-        let password = "test".to_string();
-        let key_elements = key::get_key_elements(Some(&password), None).unwrap();
-
-        let encrypted_db = dump(&db, &key_elements).unwrap();
-
-        let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
-
-        assert_eq!(decrypted_db.root.children.len(), 1);
     }
 
     #[test]
     pub fn kdbx4_with_no_compression() {
-        let mut db = create_database(
+        test_with_settings(
             OuterCipherSuite::Twofish,
             Compression::None,
             InnerCipherSuite::ChaCha20,
@@ -215,35 +169,12 @@ mod tests {
                 seed: vec![],
                 rounds: 100,
             },
-            Group {
-                children: vec![Node::Entry(Entry {
-                    uuid: Uuid::new_v4().to_string(),
-                    fields: HashMap::default(),
-                    times: HashMap::default(),
-                    expires: false,
-                    autotype: None,
-                    tags: vec![],
-                })],
-                name: "Root".to_string(),
-                uuid: Uuid::new_v4().to_string(),
-                times: HashMap::default(),
-                expires: false,
-            },
         );
-
-        let password = "test".to_string();
-        let key_elements = key::get_key_elements(Some(&password), None).unwrap();
-
-        let encrypted_db = dump(&db, &key_elements).unwrap();
-
-        let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
-
-        assert_eq!(decrypted_db.root.children.len(), 1);
     }
 
     #[test]
     pub fn kdbx4_with_salsa20() {
-        let mut db = create_database(
+        test_with_settings(
             OuterCipherSuite::AES256,
             Compression::GZip,
             InnerCipherSuite::Salsa20,
@@ -251,35 +182,12 @@ mod tests {
                 seed: vec![],
                 rounds: 100,
             },
-            Group {
-                children: vec![Node::Entry(Entry {
-                    uuid: Uuid::new_v4().to_string(),
-                    fields: HashMap::default(),
-                    times: HashMap::default(),
-                    expires: false,
-                    autotype: None,
-                    tags: vec![],
-                })],
-                name: "Root".to_string(),
-                uuid: Uuid::new_v4().to_string(),
-                times: HashMap::default(),
-                expires: false,
-            },
         );
-
-        let password = "test".to_string();
-        let key_elements = key::get_key_elements(Some(&password), None).unwrap();
-
-        let encrypted_db = dump(&db, &key_elements).unwrap();
-
-        let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
-
-        assert_eq!(decrypted_db.root.children.len(), 1);
     }
 
     #[test]
     pub fn kdbx4_with_argon_kdf() {
-        let mut db = create_database(
+        test_with_settings(
             OuterCipherSuite::AES256,
             Compression::GZip,
             InnerCipherSuite::Salsa20,
@@ -290,29 +198,6 @@ mod tests {
                 parallelism: 1,
                 version: argon2::Version::Version13,
             },
-            Group {
-                children: vec![Node::Entry(Entry {
-                    uuid: Uuid::new_v4().to_string(),
-                    fields: HashMap::default(),
-                    times: HashMap::default(),
-                    expires: false,
-                    autotype: None,
-                    tags: vec![],
-                })],
-                name: "Root".to_string(),
-                uuid: Uuid::new_v4().to_string(),
-                times: HashMap::default(),
-                expires: false,
-            },
         );
-
-        let password = "test".to_string();
-        let key_elements = key::get_key_elements(Some(&password), None).unwrap();
-
-        let encrypted_db = dump(&db, &key_elements).unwrap();
-
-        let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
-
-        assert_eq!(decrypted_db.root.children.len(), 1);
     }
 }
