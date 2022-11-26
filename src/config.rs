@@ -6,7 +6,7 @@ use std::convert::TryInto;
 
 use crate::crypt::ciphers::Cipher;
 use crate::{
-    crypt, decompress,
+    compression, crypt,
     result::{DatabaseIntegrityError, Error, Result},
     variant_dictionary::{VariantDictionary, VariantDictionaryValue},
 };
@@ -280,10 +280,10 @@ pub enum Compression {
 }
 
 impl Compression {
-    pub(crate) fn get_compression(&self) -> Box<dyn decompress::Decompress> {
+    pub(crate) fn get_compression(&self) -> Box<dyn compression::Decompress> {
         match self {
-            Compression::None => Box::new(decompress::NoCompression),
-            Compression::GZip => Box::new(decompress::GZipCompression),
+            Compression::None => Box::new(compression::NoCompression),
+            Compression::GZip => Box::new(compression::GZipCompression),
         }
     }
 

@@ -33,10 +33,10 @@
 
 #![recursion_limit = "1024"]
 
+mod compression;
 pub mod config;
 mod crypt;
 pub mod db;
-mod decompress;
 mod hmac_block_stream;
 pub mod key;
 mod keyfile;
