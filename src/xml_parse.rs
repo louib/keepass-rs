@@ -5,18 +5,21 @@ use secstr::SecStr;
 
 use xml::name::OwnedName;
 use xml::reader::{EventReader, XmlEvent};
+use xml::writer::{EmitterConfig, EventWriter, Result as XmlResult, XmlEvent as WriterEvent};
 
-use super::db::{AutoType, AutoTypeAssociation, Entry, Group, Value};
+use super::db::{AutoType, AutoTypeAssociation, Database, Entry, Group, Value};
 
 #[derive(Debug)]
 enum Node {
     Entry(Entry),
+    UUID(String),
     Group(Group),
     KeyValue(String, Value),
     AutoType(AutoType),
     AutoTypeAssociation(AutoTypeAssociation),
     ExpiryTime(String),
     Expires(bool),
+    Tags(String),
 }
 
 fn parse_xml_timestamp(t: &str) -> Result<chrono::NaiveDateTime> {
@@ -37,6 +40,120 @@ fn parse_xml_timestamp(t: &str) -> Result<chrono::NaiveDateTime> {
             Ok(ndt)
         }
     }
+}
+
+pub(crate) fn dump_database(db: &Database, inner_cipher: &mut dyn Cipher) -> Result<Vec<u8>> {
+    let mut data: Vec<u8> = vec![];
+    let mut writer = EmitterConfig::new()
+        .perform_indent(true)
+        .create_writer(&mut data);
+
+    writer.write::<WriterEvent>(WriterEvent::start_element("KeePassFile").into());
+
+    writer.write::<WriterEvent>(WriterEvent::start_element("Meta").into());
+
+    writer.write::<WriterEvent>(WriterEvent::start_element("Generator").into());
+    writer.write::<WriterEvent>(WriterEvent::characters("keepass-rs").into());
+    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+
+    // TODO DatabaseName
+    // TODO DatabaseNameChanged
+    // TODO DatabaseDescription
+    // TODO DatabaseDescriptionChanged
+    // TODO DefaultUserName
+    // TODO DefaultUserNameChanged
+    // TODO MaintenanceHistoryDays
+    // TODO Color
+    // TODO MasterKeyChanged
+    // TODO MasterKeyChangeRec
+    // TODO MasterKeyChangeForce
+    // TODO MemoryProtection
+    // TODO CustomIcons
+    // TODO RecycleBinEnabled
+    // TODO RecycleBinUUID
+    // TODO RecycleBinChanged
+    // TODO EntryTemplatesGroup
+    // TODO EntryTemplatesGroupChanged
+    // TODO LastSelectedGroup
+    // TODO LastTopVisibleGroup
+    // TODO HistoryMaxItems
+    // TODO HistoryMaxSize
+    // TODO SettingsChanged
+    // TODO CustomData
+
+    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+
+    writer.write::<WriterEvent>(WriterEvent::start_element("Root").into());
+
+    dump_xml_group(&mut writer, &db.root, inner_cipher);
+
+    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    Ok(data)
+}
+
+pub(crate) fn dump_xml_group<E: std::io::Write>(
+    writer: &mut EventWriter<E>,
+    group: &Group,
+    inner_cipher: &mut dyn Cipher,
+) {
+    writer.write::<WriterEvent>(WriterEvent::start_element("Group").into());
+
+    // TODO UUID
+    // TODO Notes
+    // TODO IconId
+
+    writer.write::<WriterEvent>(WriterEvent::start_element("Name").into());
+    writer.write::<WriterEvent>(WriterEvent::characters(&group.name).into());
+    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+
+    for child in &group.children {
+        match child {
+            crate::Node::Entry(e) => dump_xml_entry(writer, e, inner_cipher),
+            crate::Node::Group(g) => dump_xml_group(writer, g, inner_cipher),
+        }
+    }
+    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+}
+
+pub(crate) fn dump_xml_entry<E: std::io::Write>(
+    writer: &mut EventWriter<E>,
+    entry: &Entry,
+    inner_cipher: &mut dyn Cipher,
+) {
+    writer.write::<WriterEvent>(WriterEvent::start_element("Entry").into());
+
+    // TODO UUID
+    // TODO Notes
+    // TODO IconId
+    // TODO Tags
+    // TODO Times
+    // TODO AutoType
+    // TODO History
+    // TODO ForegroundColor
+    // TODO BackgroundColor
+
+    for field_name in entry.fields.keys() {
+        let field_value: String = match entry.fields.get(field_name).unwrap() {
+            Value::Bytes(b) => std::str::from_utf8(b).unwrap().to_string(),
+            // Value::Protected(sec_str) => sec_str.to_string(),
+            Value::Protected(sec_str) => continue,
+            Value::Unprotected(s) => s.to_string(),
+        };
+        writer.write::<WriterEvent>(WriterEvent::start_element("String").into());
+
+        writer.write::<WriterEvent>(WriterEvent::start_element("Key").into());
+        writer.write::<WriterEvent>(WriterEvent::characters(&field_name).into());
+        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+
+        writer.write::<WriterEvent>(WriterEvent::start_element("Value").into());
+        writer.write::<WriterEvent>(WriterEvent::characters(&field_value).into());
+        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+
+        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    }
+
+    writer.write::<WriterEvent>(WriterEvent::end_element().into());
 }
 
 pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Result<Group> {
@@ -88,6 +205,8 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                     }
                     "ExpiryTime" => parsed_stack.push(Node::ExpiryTime(String::new())),
                     "Expires" => parsed_stack.push(Node::Expires(bool::default())),
+                    "UUID" => parsed_stack.push(Node::UUID(Default::default())),
+                    "Tags" => parsed_stack.push(Node::Tags(Default::default())),
                     _ => {}
                 }
             }
@@ -105,6 +224,8 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                     "Association",
                     "ExpiryTime",
                     "Expires",
+                    "UUID",
+                    "Tags",
                 ]
                 .contains(&&local_name[..])
                 {
@@ -199,6 +320,26 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                                 *expires = es;
                             }
                         }
+
+                        Node::UUID(u) => {
+                            if let Some(&mut Node::Entry(Entry { ref mut uuid, .. })) =
+                                parsed_stack_head
+                            {
+                                *uuid = u;
+                            } else if let Some(&mut Node::Group(Group { ref mut uuid, .. })) =
+                                parsed_stack_head
+                            {
+                                *uuid = u;
+                            }
+                        }
+
+                        Node::Tags(t) => {
+                            if let Some(&mut Node::Entry(Entry { ref mut tags, .. })) =
+                                parsed_stack_head
+                            {
+                                *tags = t.split(";").map(|x| x.to_owned()).collect();
+                            }
+                        }
                     }
                 }
             }
@@ -215,8 +356,14 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                     (Some("ExpiryTime"), Some(&mut Node::ExpiryTime(ref mut et))) => {
                         *et = c;
                     }
+                    (Some("UUID"), Some(&mut Node::UUID(ref mut uuid))) => {
+                        *uuid = c;
+                    }
                     (Some("Expires"), Some(&mut Node::Expires(ref mut es))) => {
                         *es = c == "True";
+                    }
+                    (Some("Tags"), Some(&mut Node::Tags(ref mut tags))) => {
+                        *tags = c;
                     }
                     (Some("Key"), Some(&mut Node::KeyValue(ref mut k, _))) => {
                         // Got a "Key" element with a Node::KeyValue on the parsed_stack

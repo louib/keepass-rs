@@ -31,7 +31,7 @@ pub struct KDBX3Header {
 fn parse_header(data: &[u8]) -> Result<KDBX3Header> {
     let (version, file_major_version, file_minor_version) = crate::parse::get_kdbx_version(data)?;
 
-    if version != 0xb54b_fb67 || file_major_version != 3 {
+    if version != crate::db::KEEPASS_LATEST_ID || file_major_version != 3 {
         return Err(DatabaseIntegrityError::InvalidKDBXVersion {
             version,
             file_major_version,
@@ -172,6 +172,7 @@ pub(crate) fn parse(data: &[u8], key_elements: &[Vec<u8>]) -> Result<Database> {
     let mut inner_decryptor = header.inner_cipher.get_cipher(&stream_key)?;
 
     let mut root = Group {
+        uuid: Default::default(),
         name: "Root".to_owned(),
         children: Default::default(),
         expires: Default::default(),

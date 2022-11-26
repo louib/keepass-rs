@@ -120,6 +120,7 @@ pub enum Error {
     DatabaseIntegrity { e: DatabaseIntegrityError },
     IncorrectKey,
     InvalidKeyFile,
+    Unsupported(String),
 }
 
 #[cfg_attr(tarpaulin, skip)]
@@ -250,6 +251,7 @@ impl std::fmt::Display for Error {
                 Error::IO { e } => format!("IO error: {}", e),
                 Error::IncorrectKey => "Incorrect key specified".to_owned(),
                 Error::InvalidKeyFile => "Keyfile format invalid".to_owned(),
+                Error::Unsupported(s) => format!("{} is unsupported", s),
                 Error::DatabaseIntegrity { e } => format!("{}", e),
             }
         )

@@ -30,7 +30,7 @@ const HEADER_SIZE: usize = 4 + 4 + 4 + 4 + 16 + 16 + 4 + 4 + 32 + 32 + 4; // fir
 fn parse_header(data: &[u8]) -> Result<KDBHeader> {
     let (version, _, _) = crate::parse::get_kdbx_version(data)?;
 
-    if version != 0xb54b_fb65 {
+    if version != crate::db::KEEPASS_1_ID {
         return Err(DatabaseIntegrityError::InvalidKDBXVersion {
             version,
             file_major_version: 0,
@@ -292,6 +292,7 @@ fn parse_entries(
 
 fn parse_db(header: &KDBHeader, data: &[u8]) -> Result<Group> {
     let mut root = Group {
+        uuid: Default::default(),
         name: "Root".to_owned(),
         children: Default::default(),
         expires: Default::default(),

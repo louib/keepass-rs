@@ -7,6 +7,11 @@ use salsa20::{cipher::NewCipher, Salsa20};
 
 pub(crate) trait Cipher {
     fn decrypt(&mut self, ciphertext: &[u8]) -> Result<Vec<u8>>;
+    fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>>;
+    /// The number of bytes expected by the cipher as a nonce.
+    fn nonce_size() -> u8
+    where
+        Self: Sized;
 }
 
 type Aes256Cbc = Cbc<Aes256, Pkcs7>;
@@ -35,6 +40,18 @@ impl Cipher for AES256Cipher {
             .map_err(|e| Error::from(DatabaseIntegrityError::from(CryptoError::from(e))))?;
 
         Ok(buf)
+    }
+    fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>> {
+        let cipher = Aes256Cbc::new_from_slices(&self.key, &self.iv)
+            .map_err(|e| Error::from(DatabaseIntegrityError::from(CryptoError::from(e))))?;
+
+        Ok(cipher.encrypt_vec(&plaintext))
+    }
+    fn nonce_size() -> u8
+    where
+        Self: Sized,
+    {
+        16
     }
 }
 
@@ -65,6 +82,17 @@ impl Cipher for TwofishCipher {
 
         Ok(buf)
     }
+    fn encrypt(&mut self, ciphertext: &[u8]) -> Result<Vec<u8>> {
+        // TODO
+        Ok(vec![])
+    }
+    fn nonce_size() -> u8
+    where
+        Self: Sized,
+    {
+        // TODO
+        99
+    }
 }
 
 pub(crate) struct Salsa20Cipher {
@@ -87,6 +115,17 @@ impl Cipher for Salsa20Cipher {
         let mut buffer = Vec::from(ciphertext);
         self.cipher.apply_keystream(&mut buffer);
         Ok(buffer)
+    }
+    fn encrypt(&mut self, ciphertext: &[u8]) -> Result<Vec<u8>> {
+        // TODO
+        Ok(vec![])
+    }
+    fn nonce_size() -> u8
+    where
+        Self: Sized,
+    {
+        // TODO
+        99
     }
 }
 
@@ -122,6 +161,17 @@ impl Cipher for ChaCha20Cipher {
         self.cipher.apply_keystream(&mut buffer);
         Ok(buffer)
     }
+    fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>> {
+        let mut buffer = Vec::from(plaintext);
+        let cipher = self.cipher.apply_keystream(&mut buffer);
+        Ok(buffer)
+    }
+    fn nonce_size() -> u8
+    where
+        Self: Sized,
+    {
+        12
+    }
 }
 
 pub(crate) struct PlainCipher;
@@ -133,5 +183,14 @@ impl PlainCipher {
 impl Cipher for PlainCipher {
     fn decrypt(&mut self, ciphertext: &[u8]) -> Result<Vec<u8>> {
         Ok(Vec::from(ciphertext))
+    }
+    fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>> {
+        Ok(Vec::from(plaintext))
+    }
+    fn nonce_size() -> u8
+    where
+        Self: Sized,
+    {
+        12
     }
 }

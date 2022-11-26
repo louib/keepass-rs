@@ -33,17 +33,18 @@
 
 #![recursion_limit = "1024"]
 
-mod config;
+pub mod config;
 mod crypt;
-mod db;
+pub mod db;
 mod decompress;
 mod hmac_block_stream;
+pub mod key;
 mod keyfile;
 pub mod result;
 mod variant_dictionary;
 mod xml_parse;
 
-pub(crate) mod parse;
+pub mod parse;
 
 pub use self::db::*;
 pub use self::result::{CryptoError, DatabaseIntegrityError, Error, Result};

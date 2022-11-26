@@ -1,6 +1,6 @@
 pub(crate) mod kdb;
 pub(crate) mod kdbx3;
-pub(crate) mod kdbx4;
+pub mod kdbx4;
 
 use byteorder::{ByteOrder, LittleEndian};
 

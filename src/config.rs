@@ -1,10 +1,14 @@
 use hex_literal::hex;
-use std::convert::TryFrom;
 
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::convert::TryInto;
+
+use crate::crypt::ciphers::Cipher;
 use crate::{
     crypt, decompress,
     result::{DatabaseIntegrityError, Error, Result},
-    variant_dictionary::VariantDictionary,
+    variant_dictionary::{VariantDictionary, VariantDictionaryValue},
 };
 
 const _CIPHERSUITE_AES128: [u8; 16] = hex!("61ab05a1946441c38d743a563df8dd35");
@@ -33,6 +37,22 @@ impl OuterCipherSuite {
             )?)),
         }
     }
+
+    pub fn get_nonce_size(&self) -> u8 {
+        match self {
+            OuterCipherSuite::AES256 => crypt::ciphers::AES256Cipher::nonce_size(),
+            OuterCipherSuite::Twofish => crypt::ciphers::TwofishCipher::nonce_size(),
+            OuterCipherSuite::ChaCha20 => crypt::ciphers::ChaCha20Cipher::nonce_size(),
+        }
+    }
+
+    pub(crate) fn dump(&self) -> [u8; 16] {
+        match self {
+            OuterCipherSuite::AES256 => CIPHERSUITE_AES256,
+            OuterCipherSuite::Twofish => CIPHERSUITE_TWOFISH,
+            OuterCipherSuite::ChaCha20 => CIPHERSUITE_CHACHA20,
+        }
+    }
 }
 
 impl TryFrom<&[u8]> for OuterCipherSuite {
@@ -50,6 +70,10 @@ impl TryFrom<&[u8]> for OuterCipherSuite {
     }
 }
 
+const PLAIN: u32 = 0;
+const SALSA_20: u32 = 2;
+const CHA_CHA_20: u32 = 3;
+
 #[derive(Debug)]
 pub enum InnerCipherSuite {
     Plain,
@@ -65,6 +89,13 @@ impl InnerCipherSuite {
             InnerCipherSuite::ChaCha20 => Ok(Box::new(crypt::ciphers::ChaCha20Cipher::new(key)?)),
         }
     }
+    pub(crate) fn dump(&self) -> u32 {
+        match self {
+            InnerCipherSuite::Plain => PLAIN,
+            InnerCipherSuite::Salsa20 => SALSA_20,
+            InnerCipherSuite::ChaCha20 => CHA_CHA_20,
+        }
+    }
 }
 
 impl TryFrom<u32> for InnerCipherSuite {
@@ -72,9 +103,9 @@ impl TryFrom<u32> for InnerCipherSuite {
 
     fn try_from(v: u32) -> Result<InnerCipherSuite> {
         match v {
-            0 => Ok(InnerCipherSuite::Plain),
-            2 => Ok(InnerCipherSuite::Salsa20),
-            3 => Ok(InnerCipherSuite::ChaCha20),
+            PLAIN => Ok(InnerCipherSuite::Plain),
+            SALSA_20 => Ok(InnerCipherSuite::Salsa20),
+            CHA_CHA_20 => Ok(InnerCipherSuite::ChaCha20),
             _ => Err(DatabaseIntegrityError::InvalidInnerCipherID { cid: v }.into()),
         }
     }
@@ -116,6 +147,65 @@ impl KdfSettings {
                 version: *version,
             }),
         }
+    }
+
+    pub(crate) fn dump(&self) -> VariantDictionary {
+        let mut data: HashMap<String, VariantDictionaryValue> = HashMap::new();
+
+        match self {
+            KdfSettings::Aes { seed, rounds } => {
+                // FIXME this will always dump in KDBX4 format. Is this fine?
+                data.insert(
+                    "$UUID".to_string(),
+                    VariantDictionaryValue::ByteArray(KDF_AES_KDBX4.to_vec()),
+                );
+                data.insert(
+                    "R".to_string(),
+                    VariantDictionaryValue::UInt64(rounds.clone()),
+                );
+                data.insert(
+                    "S".to_string(),
+                    VariantDictionaryValue::ByteArray(seed.to_vec()),
+                );
+            }
+            KdfSettings::Argon2 {
+                memory,
+                salt,
+                iterations,
+                parallelism,
+                version,
+            } => {
+                data.insert(
+                    "$UUID".to_string(),
+                    VariantDictionaryValue::ByteArray(KDF_ARGON2.to_vec()),
+                );
+                data.insert(
+                    "M".to_string(),
+                    VariantDictionaryValue::UInt64(memory.clone()),
+                );
+                data.insert(
+                    "S".to_string(),
+                    VariantDictionaryValue::ByteArray(salt.to_vec()),
+                );
+                data.insert(
+                    "I".to_string(),
+                    VariantDictionaryValue::UInt64(iterations.clone()),
+                );
+                data.insert(
+                    "P".to_string(),
+                    VariantDictionaryValue::UInt32(parallelism.clone()),
+                );
+                match version {
+                    argon2::Version::Version10 => {
+                        data.insert("V".to_string(), VariantDictionaryValue::UInt32(0x10));
+                    }
+                    argon2::Version::Version13 => {
+                        data.insert("V".to_string(), VariantDictionaryValue::UInt32(0x13));
+                    }
+                }
+            }
+        }
+        VariantDictionary { data }
     }
 }
 
@@ -175,6 +265,13 @@ impl Compression {
         match self {
             Compression::None => Box::new(decompress::NoCompression),
             Compression::GZip => Box::new(decompress::GZipCompression),
+        }
+    }
+
+    pub(crate) fn dump(&self) -> [u8; 4] {
+        match self {
+            Compression::None => [0, 0, 0, 0],
+            Compression::GZip => [1, 0, 0, 0],
         }
     }
 }

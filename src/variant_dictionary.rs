@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 #[derive(Debug)]
 pub(crate) struct VariantDictionary {
-    data: HashMap<String, VariantDictionaryValue>,
+    pub data: HashMap<String, VariantDictionaryValue>,
 }
 
 impl VariantDictionary {
@@ -61,6 +61,72 @@ impl VariantDictionary {
         }
 
         Ok(VariantDictionary { data })
+    }
+
+    pub(crate) fn dump(&self) -> Result<Vec<u8>> {
+        let mut data: Vec<u8> = vec![];
+
+        data.resize(2, 0);
+        LittleEndian::write_u16(&mut data[0..2], 0x100);
+
+        for field_name in self.data.keys() {
+            let field_value = self.data.get(field_name).unwrap();
+
+            let mut field_buffer: Vec<u8> = vec![];
+            let field_type_id = match field_value {
+                VariantDictionaryValue::UInt32(value) => {
+                    field_buffer.resize(4, 0);
+                    LittleEndian::write_u32(&mut field_buffer, value.clone());
+                    0x04
+                }
+                VariantDictionaryValue::UInt64(value) => {
+                    field_buffer.resize(8, 0);
+                    LittleEndian::write_u64(&mut field_buffer, value.clone());
+                    0x05
+                }
+                VariantDictionaryValue::Bool(value) => {
+                    if *value {
+                        field_buffer.push(1);
+                    } else {
+                        field_buffer.push(0);
+                    }
+                    0x08
+                }
+                VariantDictionaryValue::Int32(value) => {
+                    field_buffer.resize(4, 0);
+                    LittleEndian::write_i32(&mut field_buffer, value.clone());
+                    0x0c
+                }
+                VariantDictionaryValue::Int64(value) => {
+                    field_buffer.resize(8, 0);
+                    LittleEndian::write_i64(&mut field_buffer, value.clone());
+                    0x0d
+                }
+                VariantDictionaryValue::String(value) => {
+                    field_buffer = value.to_owned().into_bytes();
+                    0x18
+                }
+                VariantDictionaryValue::ByteArray(value) => {
+                    field_buffer = value.to_vec();
+                    0x42
+                }
+            };
+
+            data.push(field_type_id);
+
+            let field_name_bytes = field_name.as_bytes();
+            let pos = data.len();
+            data.resize(pos + 4, 0);
+            LittleEndian::write_u32(&mut data[pos..pos + 4], field_name_bytes.len() as u32);
+            data.extend_from_slice(field_name_bytes);
+
+            let pos = data.len();
+            data.resize(pos + 4, 0);
+            LittleEndian::write_u32(&mut data[pos..pos + 4], field_buffer.len() as u32);
+            data.extend_from_slice(&field_buffer);
+        }
+
+        Ok(data)
     }
 
     pub(crate) fn get<T>(&self, key: &str) -> Result<T>

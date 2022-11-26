@@ -2,7 +2,7 @@ use secstr::SecStr;
 use std::collections::{HashMap, VecDeque};
 
 use crate::{
-    crypt,
+    crypt, key,
     parse::{
         kdb::KDBHeader,
         kdbx3::KDBX3Header,
@@ -37,26 +37,48 @@ pub struct Database {
     pub root: Group,
 }
 
+/// Identifier for KeePass 1 format.
+pub const KEEPASS_1_ID: u32 = 0xb54bfb65;
+/// Identifier for KeePass 2 pre-release format.
+pub const KEEPASS_2_ID: u32 = 0xb54bfb66;
+/// Identifier for the latest KeePass formats.
+pub const KEEPASS_LATEST_ID: u32 = 0xb54bfb67;
+
 impl Database {
+    /// Save a database to a std::io::Write
+    pub fn save(
+        &self,
+        destination: &mut dyn std::io::Write,
+        password: Option<&str>,
+        keyfile: Option<&mut dyn std::io::Read>,
+    ) -> Result<()> {
+        let key_elements = key::get_key_elements(password, keyfile)?;
+
+        let data = match self.header {
+            Header::KDB(_) => {
+                return Err(crate::result::Error::Unsupported(
+                    "saving KDB version 1".to_string(),
+                ))
+            }
+            Header::KDBX3(_) => {
+                return Err(crate::result::Error::Unsupported(
+                    "saving KDB version 3".to_string(),
+                ))
+            }
+            Header::KDBX4(_) => crate::parse::kdbx4::dump(self, &key_elements),
+        }?;
+
+        destination.write_all(&data)?;
+        Ok(())
+    }
+
     /// Parse a database from a std::io::Read
     pub fn open(
         source: &mut dyn std::io::Read,
         password: Option<&str>,
         keyfile: Option<&mut dyn std::io::Read>,
     ) -> Result<Database> {
-        let mut key_elements: Vec<Vec<u8>> = Vec::new();
-
-        if let Some(p) = password {
-            key_elements.push(
-                crypt::calculate_sha256(&[p.as_bytes()])?
-                    .as_slice()
-                    .to_vec(),
-            );
-        }
-
-        if let Some(f) = keyfile {
-            key_elements.push(crate::keyfile::parse(f)?);
-        }
+        let key_elements = key::get_key_elements(password, keyfile)?;
 
         let mut data = Vec::new();
         source.read_to_end(&mut data)?;
@@ -65,12 +87,12 @@ impl Database {
             crate::parse::get_kdbx_version(data.as_ref())?;
 
         match version {
-            0xb54bfb65 => crate::parse::kdb::parse(data.as_ref(), &key_elements),
-            // 0xb54bfb66 => alpha/beta kbd 2.x
-            0xb54bfb67 if file_major_version == 3 => {
+            KEEPASS_1_ID => crate::parse::kdb::parse(data.as_ref(), &key_elements),
+            // KEEPASS_2_ID => alpha/beta kbd 2.x
+            KEEPASS_LATEST_ID if file_major_version == 3 => {
                 crate::parse::kdbx3::parse(data.as_ref(), &key_elements)
             }
-            0xb54bfb67 if file_major_version == 4 => {
+            KEEPASS_LATEST_ID if file_major_version == 4 => {
                 crate::parse::kdbx4::parse(data.as_ref(), &key_elements)
             }
             _ => Err(DatabaseIntegrityError::InvalidKDBXVersion {
@@ -88,19 +110,7 @@ impl Database {
         password: Option<&str>,
         keyfile: Option<&mut dyn std::io::Read>,
     ) -> Result<Vec<Vec<u8>>> {
-        let mut key_elements: Vec<Vec<u8>> = Vec::new();
-
-        if let Some(p) = password {
-            key_elements.push(
-                crypt::calculate_sha256(&[p.as_bytes()])?
-                    .as_slice()
-                    .to_vec(),
-            );
-        }
-
-        if let Some(f) = keyfile {
-            key_elements.push(crate::keyfile::parse(f)?);
-        }
+        let mut key_elements = key::get_key_elements(password, keyfile)?;
 
         let mut data = Vec::new();
         source.read_to_end(&mut data)?;
@@ -109,12 +119,12 @@ impl Database {
             crate::parse::get_kdbx_version(data.as_ref())?;
 
         let data = match version {
-            0xb54bfb65 => panic!("Dumping XML from KDB databases not supported"),
-            // 0xb54bfb66 => alpha/beta kbd 2.x
-            0xb54bfb67 if file_major_version == 3 => {
+            KEEPASS_1_ID => panic!("Dumping XML from KDB databases not supported"),
+            // KEEPASS_2_ID => alpha/beta kbd 2.x
+            KEEPASS_LATEST_ID if file_major_version == 3 => {
                 crate::parse::kdbx3::decrypt_xml(data.as_ref(), &key_elements)?.1
             }
-            0xb54bfb67 if file_major_version == 4 => {
+            KEEPASS_LATEST_ID if file_major_version == 4 => {
                 vec![crate::parse::kdbx4::decrypt_xml(data.as_ref(), &key_elements)?.2]
             }
             _ => {
@@ -135,6 +145,9 @@ impl Database {
 /// A database group with child groups and entries
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct Group {
+    /// The unique identifier of the group
+    pub uuid: String,
+
     /// The name of the group
     pub name: String,
 
@@ -321,10 +334,12 @@ impl<'a> std::convert::From<&'a mut Node> for NodeRefMut<'a> {
 /// A database entry containing several key-value fields.
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct Entry {
+    pub uuid: String,
     pub fields: HashMap<String, Value>,
     pub autotype: Option<AutoType>,
     pub expires: bool,
     pub times: HashMap<String, chrono::NaiveDateTime>,
+    pub tags: Vec<String>,
 }
 
 impl<'a> Entry {
@@ -346,6 +361,10 @@ impl<'a> Entry {
             Some(&Value::Unprotected(_)) => None,
             None => None,
         }
+    }
+
+    pub fn get_uuid(&'a self) -> &'a str {
+        &self.uuid
     }
 
     /// Get a timestamp field by name
