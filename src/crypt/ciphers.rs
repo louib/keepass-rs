@@ -118,8 +118,9 @@ impl Cipher for Salsa20Cipher {
         Ok(buffer)
     }
     fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>> {
-        // TODO
-        Ok(vec![])
+        let mut buffer = Vec::from(plaintext);
+        self.cipher.apply_keystream(&mut buffer);
+        Ok(buffer)
     }
     fn nonce_size() -> u8
     where

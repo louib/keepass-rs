@@ -15,6 +15,7 @@ mod tests {
         outer_cipher_suite: OuterCipherSuite,
         compression: Compression,
         inner_cipher_suite: InnerCipherSuite,
+        kdf_setting: KdfSettings,
         root: Group,
     ) -> Database {
         let mut outer_iv: Vec<u8> = vec![];
@@ -31,6 +32,33 @@ mod tests {
             inner_random_stream_key.push(4);
         }
 
+        let mut kdf: KdfSettings;
+        match kdf_setting {
+            KdfSettings::Aes { rounds, .. } => {
+                // FIXME obviously this is ugly. We should be able to change
+                // the seed in the first kdf object.
+                let mut kdf_seed: Vec<u8> = vec![];
+                let mut kdf_seed_size = kdf_setting.seed_size();
+                for _ in 0..kdf_seed_size {
+                    // FIXME obviously this is not random.
+                    kdf_seed.push(4);
+                }
+                kdf = KdfSettings::Aes {
+                    seed: kdf_seed,
+                    rounds,
+                };
+            }
+            KdfSettings::Argon2 { .. } => {
+                kdf = KdfSettings::Argon2 {
+                    salt: vec![],
+                    iterations: 100,
+                    memory: 100,
+                    parallelism: 1,
+                    version: argon2::Version::Version13,
+                };
+            }
+        };
+
         Database {
             header: Header::KDBX4(KDBX4Header {
                 version: KEEPASS_LATEST_ID,
@@ -42,13 +70,7 @@ mod tests {
                     20, 101, 241, 68, 200, 91, 82, 118, 52, 156, 63, 110, 170, 88, 161, 210,
                 ],
                 outer_iv,
-                kdf: KdfSettings::Aes {
-                    seed: vec![
-                        120, 166, 99, 138, 179, 29, 86, 23, 180, 75, 185, 223, 222, 163, 9, 102, 6,
-                        230, 111, 31, 252, 134, 52, 71, 120, 190, 55, 3, 73, 249, 252, 99,
-                    ],
-                    rounds: 100,
-                },
+                kdf,
                 body_start: 0,
             }),
             inner_header: InnerHeader::KDBX4(KDBX4InnerHeader {
@@ -67,6 +89,10 @@ mod tests {
             OuterCipherSuite::AES256,
             Compression::GZip,
             InnerCipherSuite::ChaCha20,
+            KdfSettings::Aes {
+                seed: vec![],
+                rounds: 100,
+            },
             Group {
                 children: vec![Node::Entry(Entry {
                     uuid: Uuid::new_v4().to_string(),
@@ -99,6 +125,10 @@ mod tests {
             OuterCipherSuite::ChaCha20,
             Compression::GZip,
             InnerCipherSuite::ChaCha20,
+            KdfSettings::Aes {
+                seed: vec![],
+                rounds: 100,
+            },
             Group {
                 children: vec![Node::Entry(Entry {
                     uuid: Uuid::new_v4().to_string(),
@@ -131,6 +161,10 @@ mod tests {
             OuterCipherSuite::Twofish,
             Compression::GZip,
             InnerCipherSuite::ChaCha20,
+            KdfSettings::Aes {
+                seed: vec![],
+                rounds: 100,
+            },
             Group {
                 children: vec![Node::Entry(Entry {
                     uuid: Uuid::new_v4().to_string(),
@@ -163,6 +197,10 @@ mod tests {
             OuterCipherSuite::Twofish,
             Compression::None,
             InnerCipherSuite::ChaCha20,
+            KdfSettings::Aes {
+                seed: vec![],
+                rounds: 100,
+            },
             Group {
                 children: vec![Node::Entry(Entry {
                     uuid: Uuid::new_v4().to_string(),
@@ -195,6 +233,10 @@ mod tests {
             OuterCipherSuite::AES256,
             Compression::GZip,
             InnerCipherSuite::Salsa20,
+            KdfSettings::Aes {
+                seed: vec![],
+                rounds: 100,
+            },
             Group {
                 children: vec![Node::Entry(Entry {
                     uuid: Uuid::new_v4().to_string(),

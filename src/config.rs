@@ -125,15 +125,27 @@ pub enum KdfSettings {
         rounds: u64,
     },
     Argon2 {
-        memory: u64,
         salt: Vec<u8>,
         iterations: u64,
+        memory: u64,
         parallelism: u32,
         version: argon2::Version,
     },
 }
 
 impl KdfSettings {
+    pub fn seed_size(&self) -> u8 {
+        match self {
+            KdfSettings::Aes { seed, rounds } => 32,
+            KdfSettings::Argon2 {
+                salt,
+                memory,
+                iterations,
+                parallelism,
+                version,
+            } => 32,
+        }
+    }
     pub(crate) fn get_kdf(&self) -> Box<dyn crypt::kdf::Kdf> {
         match self {
             KdfSettings::Aes { seed, rounds } => Box::new(crypt::kdf::AesKdf {
