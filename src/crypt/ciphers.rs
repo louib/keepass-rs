@@ -82,16 +82,17 @@ impl Cipher for TwofishCipher {
 
         Ok(buf)
     }
-    fn encrypt(&mut self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        // TODO
-        Ok(vec![])
+    fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>> {
+        let cipher = TwofishCbc::new_from_slices(&self.key, &self.iv)
+            .map_err(|e| Error::from(DatabaseIntegrityError::from(CryptoError::from(e))))?;
+
+        Ok(cipher.encrypt_vec(&plaintext))
     }
     fn nonce_size() -> u8
     where
         Self: Sized,
     {
-        // TODO
-        99
+        16
     }
 }
 
@@ -116,7 +117,7 @@ impl Cipher for Salsa20Cipher {
         self.cipher.apply_keystream(&mut buffer);
         Ok(buffer)
     }
-    fn encrypt(&mut self, ciphertext: &[u8]) -> Result<Vec<u8>> {
+    fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>> {
         // TODO
         Ok(vec![])
     }

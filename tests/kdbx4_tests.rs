@@ -119,4 +119,36 @@ mod tests {
 
         assert_eq!(decrypted_db.root.children.len(), 1);
     }
+
+    #[test]
+    pub fn kdbx4_with_password_kdf_argon2_cipher_twofish() {
+        let mut db = create_database(
+            OuterCipherSuite::Twofish,
+            Compression::GZip,
+            InnerCipherSuite::ChaCha20,
+            Group {
+                children: vec![Node::Entry(Entry {
+                    uuid: Uuid::new_v4().to_string(),
+                    fields: HashMap::default(),
+                    times: HashMap::default(),
+                    expires: false,
+                    autotype: None,
+                    tags: vec![],
+                })],
+                name: "Root".to_string(),
+                uuid: Uuid::new_v4().to_string(),
+                times: HashMap::default(),
+                expires: false,
+            },
+        );
+
+        let password = "test".to_string();
+        let key_elements = key::get_key_elements(Some(&password), None).unwrap();
+
+        let encrypted_db = dump(&db, &key_elements).unwrap();
+
+        let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
+
+        assert_eq!(decrypted_db.root.children.len(), 1);
+    }
 }
