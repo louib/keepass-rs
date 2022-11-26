@@ -3,10 +3,12 @@ use std::error::Error;
 use crate::crypt;
 use crate::result;
 
+pub type KeyElements = Vec<Vec<u8>>;
+
 pub fn get_key_elements(
     password: Option<&str>,
     keyfile: Option<&mut dyn std::io::Read>,
-) -> Result<Vec<Vec<u8>>, result::Error> {
+) -> Result<KeyElements, result::Error> {
     let mut key_elements: Vec<Vec<u8>> = Vec::new();
 
     if let Some(p) = password {
