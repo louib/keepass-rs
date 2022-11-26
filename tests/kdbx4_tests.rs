@@ -11,6 +11,43 @@ mod tests {
     use std::collections::HashMap;
     use std::{fs::File, path::Path};
 
+    fn test_with_settings(
+        outer_cipher_suite: OuterCipherSuite,
+        compression: Compression,
+        inner_cipher_suite: InnerCipherSuite,
+        kdf_setting: KdfSettings,
+    ) {
+        let mut db = create_database(
+            outer_cipher_suite,
+            compression,
+            inner_cipher_suite,
+            kdf_setting,
+            Group {
+                children: vec![Node::Entry(Entry {
+                    uuid: Uuid::new_v4().to_string(),
+                    fields: HashMap::default(),
+                    times: HashMap::default(),
+                    expires: false,
+                    autotype: None,
+                    tags: vec![],
+                })],
+                name: "Root".to_string(),
+                uuid: Uuid::new_v4().to_string(),
+                times: HashMap::default(),
+                expires: false,
+            },
+        );
+
+        let password = "test".to_string();
+        let key_elements = key::get_key_elements(Some(&password), None).unwrap();
+
+        let encrypted_db = dump(&db, &key_elements).unwrap();
+
+        let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
+
+        assert_eq!(decrypted_db.root.children.len(), 1);
+    }
+
     fn create_database(
         outer_cipher_suite: OuterCipherSuite,
         compression: Compression,
@@ -84,8 +121,8 @@ mod tests {
     }
 
     #[test]
-    pub fn kdbx4_with_password_kdf_argon2_cipher_aes() {
-        let mut db = create_database(
+    pub fn kdbx4_with_kdf_argon2_cipher_aes() {
+        test_with_settings(
             OuterCipherSuite::AES256,
             Compression::GZip,
             InnerCipherSuite::ChaCha20,
@@ -93,34 +130,11 @@ mod tests {
                 seed: vec![],
                 rounds: 100,
             },
-            Group {
-                children: vec![Node::Entry(Entry {
-                    uuid: Uuid::new_v4().to_string(),
-                    fields: HashMap::default(),
-                    times: HashMap::default(),
-                    expires: false,
-                    autotype: None,
-                    tags: vec![],
-                })],
-                name: "Root".to_string(),
-                uuid: Uuid::new_v4().to_string(),
-                times: HashMap::default(),
-                expires: false,
-            },
         );
-
-        let password = "test".to_string();
-        let key_elements = key::get_key_elements(Some(&password), None).unwrap();
-
-        let encrypted_db = dump(&db, &key_elements).unwrap();
-
-        let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
-
-        assert_eq!(decrypted_db.root.children.len(), 1);
     }
 
     #[test]
-    pub fn kdbx4_with_password_kdf_argon2_cipher_chacha() {
+    pub fn kdbx4_with_kdf_argon2_cipher_chacha() {
         let mut db = create_database(
             OuterCipherSuite::ChaCha20,
             Compression::GZip,
@@ -156,7 +170,7 @@ mod tests {
     }
 
     #[test]
-    pub fn kdbx4_with_password_kdf_argon2_cipher_twofish() {
+    pub fn kdbx4_with_kdf_argon2_cipher_twofish() {
         let mut db = create_database(
             OuterCipherSuite::Twofish,
             Compression::GZip,
@@ -192,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    pub fn kdbx4_with_password_no_compression() {
+    pub fn kdbx4_with_no_compression() {
         let mut db = create_database(
             OuterCipherSuite::Twofish,
             Compression::None,
@@ -228,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    pub fn kdbx4_with_password_salsa20() {
+    pub fn kdbx4_with_salsa20() {
         let mut db = create_database(
             OuterCipherSuite::AES256,
             Compression::GZip,
