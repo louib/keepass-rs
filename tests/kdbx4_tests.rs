@@ -108,13 +108,11 @@ mod tests {
                 ],
                 outer_iv,
                 kdf,
-                body_start: 0,
             }),
             inner_header: InnerHeader::KDBX4(KDBX4InnerHeader {
                 inner_random_stream: inner_cipher_suite,
                 inner_random_stream_key,
                 binaries: vec![],
-                body_start: 0,
             }),
             root,
         }

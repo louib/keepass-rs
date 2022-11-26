@@ -27,7 +27,6 @@ pub struct KDBX4Header {
     pub master_seed: Vec<u8>,
     pub outer_iv: Vec<u8>,
     pub kdf: KdfSettings,
-    pub body_start: usize,
 }
 
 pub const HEADER_END_ID: u8 = 0;
@@ -65,7 +64,6 @@ pub struct KDBX4InnerHeader {
     pub inner_random_stream: InnerCipherSuite,
     pub inner_random_stream_key: Vec<u8>,
     pub binaries: Vec<BinaryAttachment>,
-    pub body_start: usize,
 }
 
 // TODO move this to parse with get_kdbx_version.
@@ -121,7 +119,7 @@ fn write_header_field(header_data: &mut Vec<u8>, field_id: u8, field_value: &[u8
     header_data.extend_from_slice(field_value);
 }
 
-fn parse_outer_header(data: &[u8]) -> Result<KDBX4Header> {
+fn parse_outer_header(data: &[u8]) -> Result<(KDBX4Header, usize)> {
     let (version, file_major_version, file_minor_version) = crate::parse::get_kdbx_version(data)?;
 
     if version != crate::db::KEEPASS_LATEST_ID || file_major_version != 4 {
@@ -219,20 +217,22 @@ fn parse_outer_header(data: &[u8]) -> Result<KDBX4Header> {
 
     // panic!("master seed {:?}", master_seed);
 
-    Ok(KDBX4Header {
-        version,
-        file_major_version,
-        file_minor_version,
-        outer_cipher,
-        compression,
-        master_seed,
-        outer_iv,
-        kdf,
-        body_start: pos,
-    })
+    Ok((
+        KDBX4Header {
+            version,
+            file_major_version,
+            file_minor_version,
+            outer_cipher,
+            compression,
+            master_seed,
+            outer_iv,
+            kdf,
+        },
+        pos,
+    ))
 }
 
-fn parse_inner_header(data: &[u8]) -> Result<KDBX4InnerHeader> {
+fn parse_inner_header(data: &[u8]) -> Result<(KDBX4InnerHeader, usize)> {
     let mut pos = 0;
 
     let mut inner_random_stream = None;
@@ -284,12 +284,14 @@ fn parse_inner_header(data: &[u8]) -> Result<KDBX4InnerHeader> {
     let inner_random_stream = get_or_err(inner_random_stream, "Inner random stream UUID")?;
     let inner_random_stream_key = get_or_err(inner_random_stream_key, "Inner random stream key")?;
 
-    Ok(KDBX4InnerHeader {
-        inner_random_stream,
-        inner_random_stream_key,
-        binaries,
-        body_start: pos,
-    })
+    Ok((
+        KDBX4InnerHeader {
+            inner_random_stream,
+            inner_random_stream_key,
+            binaries,
+        },
+        pos,
+    ))
 }
 
 fn dump_inner_header(inner_header: &KDBX4InnerHeader) -> Result<Vec<u8>> {
@@ -409,18 +411,17 @@ pub(crate) fn decrypt_xml(
     key_elements: &[Vec<u8>],
 ) -> Result<(KDBX4Header, KDBX4InnerHeader, Vec<u8>)> {
     // parse header
-    let header = parse_outer_header(data)?;
-    let pos = header.body_start;
+    let (header, body_start) = parse_outer_header(data)?;
 
     // split file into segments:
     //      header_data         - The outer header data
     //      header_sha256       - A Sha256 hash of header_data (for verification of header integrity)
     //      header_hmac         - A HMAC of the header_data (for verification of the key_elements)
     //      hmac_block_stream   - A HMAC-verified block stream of encrypted and compressed blocks
-    let header_data = &data[0..pos];
-    let header_sha256 = &data[pos..(pos + 32)];
-    let header_hmac = &data[(pos + 32)..(pos + 64)];
-    let hmac_block_stream = &data[(pos + 64)..];
+    let header_data = &data[0..body_start];
+    let header_sha256 = &data[body_start..(body_start + 32)];
+    let header_hmac = &data[(body_start + 32)..(body_start + 64)];
+    let hmac_block_stream = &data[(body_start + 64)..];
 
     // derive master key from composite key, transform_seed, transform_rounds and master_seed
     let key_elements: Vec<&[u8]> = key_elements.iter().map(|v| &v[..]).collect();
@@ -429,7 +430,7 @@ pub(crate) fn decrypt_xml(
     let master_key = crypt::calculate_sha256(&[header.master_seed.as_ref(), &transformed_key])?;
 
     // verify header
-    if header_sha256 != crypt::calculate_sha256(&[&data[0..pos]])?.as_slice() {
+    if header_sha256 != crypt::calculate_sha256(&[&data[0..body_start]])?.as_slice() {
         return Err(DatabaseIntegrityError::HeaderHashMismatch.into());
     }
 
@@ -455,10 +456,10 @@ pub(crate) fn decrypt_xml(
         .decompress(&payload_compressed)?;
 
     // KDBX4 has inner header, too - parse it
-    let inner_header = parse_inner_header(&payload)?;
+    let (inner_header, xml_start) = parse_inner_header(&payload)?;
 
     // after inner header is one XML document
-    let xml = &payload[inner_header.body_start..];
+    let xml = &payload[xml_start..];
 
     Ok((header, inner_header, xml.to_vec()))
 }
