@@ -45,7 +45,7 @@ fn parse_xml_timestamp(t: &str) -> Result<chrono::NaiveDateTime> {
 pub(crate) fn dump_database(db: &Database, inner_cipher: &mut dyn Cipher) -> Result<Vec<u8>> {
     let mut data: Vec<u8> = vec![];
     let mut writer = EmitterConfig::new()
-        .perform_indent(true)
+        .perform_indent(false)
         .create_writer(&mut data);
 
     writer.write::<WriterEvent>(WriterEvent::start_element("KeePassFile").into());

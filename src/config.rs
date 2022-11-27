@@ -273,7 +273,7 @@ impl TryFrom<VariantDictionary> for KdfSettings {
     }
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum Compression {
     None,
     GZip,

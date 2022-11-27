@@ -58,6 +58,13 @@ impl TryFrom<&[u8]> for BinaryAttachment {
         Ok(BinaryAttachment { flags, content })
     }
 }
+impl BinaryAttachment {
+    fn dump(&self) -> Vec<u8> {
+        let mut attachment: Vec<u8> = vec![self.flags];
+        attachment.extend_from_slice(&self.content.clone());
+        attachment
+    }
+}
 
 #[derive(Debug)]
 pub struct KDBX4InnerHeader {
@@ -375,10 +382,12 @@ pub fn dump(db: &Database, key_elements: &[Vec<u8>]) -> Result<Vec<u8>> {
     payload.extend_from_slice(&xml);
 
     let payload_compressed = header.compression.get_compression().compress(&payload)?;
+
     let payload_encrypted = header
         .outer_cipher
         .get_cipher(&master_key, header.outer_iv.as_ref())?
         .encrypt(&payload_compressed)?;
+
     let payload_hmac = hmac_block_stream::write_hmac_block_stream(&payload_encrypted, &hmac_key)?;
     data.extend_from_slice(&payload_hmac);
 
@@ -450,6 +459,7 @@ pub(crate) fn decrypt_xml(
         .outer_cipher
         .get_cipher(&master_key, header.outer_iv.as_ref())?
         .decrypt(&payload_encrypted)?;
+
     let payload = header
         .compression
         .get_compression()
