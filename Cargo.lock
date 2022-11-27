@@ -303,6 +303,7 @@ dependencies = [
  "cipher",
  "clap",
  "flate2",
+ "getrandom",
  "hex-literal",
  "hmac",
  "rpassword",

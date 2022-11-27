@@ -37,6 +37,7 @@ twofish = "0.6"
 chrono = "0.4"
 
 uuid = { version = "1.2", features = ["v4"] }
+getrandom = { version = "0.2" }
 
 # dependencies for command-line utilities
 clap = { version = "2.33.0", optional = true }

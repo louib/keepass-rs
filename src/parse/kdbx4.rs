@@ -29,6 +29,8 @@ pub struct KDBX4Header {
     pub kdf: KdfSettings,
 }
 
+pub const HEADER_MASTER_SEED_SIZE: u8 = 16;
+
 pub const HEADER_END_ID: u8 = 0;
 pub const HEADER_COMMENT_ID: u8 = 1;
 pub const HEADER_OUTER_ENCRYPTION_ID: u8 = 2;

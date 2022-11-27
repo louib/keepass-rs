@@ -56,11 +56,8 @@ mod tests {
         root: Group,
     ) -> Database {
         let mut outer_iv: Vec<u8> = vec![];
-        let mut outer_iv_size = outer_cipher_suite.get_nonce_size();
-        for _ in 0..outer_iv_size {
-            // FIXME obviously this is not random.
-            outer_iv.push(4);
-        }
+        outer_iv.resize(outer_cipher_suite.get_nonce_size().into(), 0);
+        getrandom::getrandom(&mut outer_iv);
 
         let mut inner_random_stream_key: Vec<u8> = vec![];
         let mut inner_random_stream_key_size = inner_cipher_suite.get_nonce_size();
@@ -76,6 +73,11 @@ mod tests {
             // FIXME obviously this is not random.
             kdf_seed.push(4);
         }
+
+        let mut master_seed: Vec<u8> = vec![];
+        master_seed.resize(keepass::parse::kdbx4::HEADER_MASTER_SEED_SIZE.into(), 0);
+        getrandom::getrandom(&mut master_seed);
+
         match kdf_setting {
             KdfSettings::Aes { rounds, .. } => {
                 // FIXME obviously this is ugly. We should be able to change
@@ -103,9 +105,7 @@ mod tests {
                 file_minor_version: 3,
                 outer_cipher: outer_cipher_suite,
                 compression,
-                master_seed: vec![
-                    20, 101, 241, 68, 200, 91, 82, 118, 52, 156, 63, 110, 170, 88, 161, 210,
-                ],
+                master_seed,
                 outer_iv,
                 kdf,
             }),
