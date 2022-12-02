@@ -46,8 +46,8 @@ pub const INNER_HEADER_BINARY_ATTACHMENTS: u8 = 3;
 
 #[derive(Debug)]
 pub struct BinaryAttachment {
-    flags: u8,
-    content: Vec<u8>,
+    pub flags: u8,
+    pub content: Vec<u8>,
 }
 
 impl TryFrom<&[u8]> for BinaryAttachment {

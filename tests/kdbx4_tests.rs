@@ -36,6 +36,7 @@ mod tests {
                 times: HashMap::default(),
                 expires: false,
             },
+            vec![],
         );
 
         let password = "test".to_string();
@@ -54,6 +55,7 @@ mod tests {
         inner_cipher_suite: InnerCipherSuite,
         kdf_setting: KdfSettings,
         root: Group,
+        binaries: Vec<BinaryAttachment>,
     ) -> Database {
         let mut outer_iv: Vec<u8> = vec![];
         outer_iv.resize(outer_cipher_suite.get_nonce_size().into(), 0);
@@ -197,5 +199,64 @@ mod tests {
                 version: argon2::Version::Version13,
             },
         );
+    }
+
+    #[test]
+    pub fn kdbx4_with_binary_attachments() {
+        let mut db = create_database(
+            OuterCipherSuite::AES256,
+            Compression::GZip,
+            InnerCipherSuite::Salsa20,
+            KdfSettings::Argon2 {
+                salt: vec![],
+                iterations: 1000,
+                memory: 1000,
+                parallelism: 1,
+                version: argon2::Version::Version13,
+            },
+            Group {
+                children: vec![Node::Entry(Entry {
+                    uuid: Uuid::new_v4().to_string(),
+                    fields: HashMap::default(),
+                    times: HashMap::default(),
+                    expires: false,
+                    autotype: None,
+                    tags: vec![],
+                })],
+                name: "Root".to_string(),
+                uuid: Uuid::new_v4().to_string(),
+                times: HashMap::default(),
+                expires: false,
+            },
+            vec![
+                BinaryAttachment {
+                    flags: 1,
+                    content: vec![0x01, 0x02, 0x03, 0x04],
+                },
+                BinaryAttachment {
+                    flags: 2,
+                    content: vec![0x04, 0x03, 0x02, 0x01],
+                },
+            ],
+        );
+
+        let password = "test".to_string();
+        let key_elements = key::get_key_elements(Some(&password), None).unwrap();
+
+        let encrypted_db = dump(&db, &key_elements).unwrap();
+
+        let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
+
+        assert_eq!(decrypted_db.root.children.len(), 1);
+
+        let binaries = match decrypted_db.inner_header {
+            keepass::InnerHeader::KDBX4(KDBX4InnerHeader {
+                inner_random_stream,
+                inner_random_stream_key,
+                binaries,
+            }) => binaries,
+            _ => panic!(""),
+        };
+        assert_eq!(binaries.len(), 2);
     }
 }
