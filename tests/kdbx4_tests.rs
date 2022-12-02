@@ -258,5 +258,7 @@ mod tests {
             _ => panic!(""),
         };
         assert_eq!(binaries.len(), 2);
+        assert_eq!(binaries[0].flags, 1);
+        assert_eq!(binaries[0].content, [0x01, 0x02, 0x03, 0x04]);
     }
 }
