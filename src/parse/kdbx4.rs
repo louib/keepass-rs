@@ -40,6 +40,7 @@ pub const HEADER_ENCRYPTION_IV_ID: u8 = 7;
 pub const HEADER_KDF_PARAMS_ID: u8 = 11;
 
 pub const INNER_HEADER_END: u8 = 0;
+/// The ID of the inner header random stream
 pub const INNER_HEADER_RANDOM_STREAM: u8 = 1;
 pub const INNER_HEADER_RANDOM_STREAM_KEY: u8 = 2;
 pub const INNER_HEADER_BINARY_ATTACHMENTS: u8 = 3;
@@ -224,8 +225,6 @@ fn parse_outer_header(data: &[u8]) -> Result<(KDBX4Header, usize)> {
 
     let kdf = get_or_err(kdf, "Key Derivation Function Parameters")?;
 
-    // panic!("master seed {:?}", master_seed);
-
     Ok((
         KDBX4Header {
             version,
@@ -256,21 +255,17 @@ fn parse_inner_header(data: &[u8]) -> Result<(KDBX4InnerHeader, usize)> {
         pos += 5 + entry_length;
 
         match entry_type {
-            // end of header
-            0x00 => break,
+            INNER_HEADER_END => break,
 
-            // inner random stream ID
-            0x01 => {
+            INNER_HEADER_RANDOM_STREAM => {
                 inner_random_stream = Some(InnerCipherSuite::try_from(LittleEndian::read_u32(
                     &entry_buffer,
                 ))?);
             }
 
-            // inner random stream key
-            0x02 => inner_random_stream_key = Some(entry_buffer.to_vec()),
+            INNER_HEADER_RANDOM_STREAM_KEY => inner_random_stream_key = Some(entry_buffer.to_vec()),
 
-            // binary attachment
-            0x03 => {
+            INNER_HEADER_BINARY_ATTACHMENTS => {
                 let binary = BinaryAttachment::try_from(entry_buffer)?;
                 binaries.push(binary);
             }
@@ -324,7 +319,13 @@ fn dump_inner_header(inner_header: &KDBX4InnerHeader) -> Result<Vec<u8>> {
         &inner_header.inner_random_stream_key,
     );
 
-    // TODO also dump the binary attachments.
+    for binary in &inner_header.binaries {
+        write_header_field(
+            &mut header_data,
+            INNER_HEADER_BINARY_ATTACHMENTS,
+            &binary.dump(),
+        );
+    }
 
     write_header_field(&mut header_data, INNER_HEADER_END, &[]);
 
