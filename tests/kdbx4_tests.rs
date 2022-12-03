@@ -62,11 +62,9 @@ mod kdbx4_tests {
         getrandom::getrandom(&mut outer_iv);
 
         let mut inner_random_stream_key: Vec<u8> = vec![];
-        let mut inner_random_stream_key_size = inner_cipher_suite.get_nonce_size();
-        for _ in 0..inner_random_stream_key_size {
-            // FIXME obviously this is not random.
-            inner_random_stream_key.push(4);
-        }
+        inner_random_stream_key.resize(inner_cipher_suite.get_nonce_size().into(), 0);
+        // FIXME this should work, but for some reason doesn't
+        // getrandom::getrandom(&mut inner_random_stream_key);
 
         let mut kdf: KdfSettings;
         let mut kdf_seed: Vec<u8> = vec![];
