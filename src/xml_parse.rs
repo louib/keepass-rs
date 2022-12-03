@@ -1,9 +1,12 @@
 use crate::crypt::ciphers::Cipher;
 use crate::result::{DatabaseIntegrityError, Error, Result};
+use std::collections::BTreeMap;
 
 use secstr::SecStr;
 
-use xml::name::OwnedName;
+use xml::attribute::OwnedAttribute;
+use xml::name::{Name, OwnedName};
+use xml::namespace::Namespace;
 use xml::reader::{EventReader, XmlEvent};
 use xml::writer::{EmitterConfig, EventWriter, Result as XmlResult, XmlEvent as WriterEvent};
 
@@ -163,11 +166,17 @@ pub(crate) fn dump_xml_entry<E: std::io::Write>(
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
 
     for field_name in entry.fields.keys() {
+        let mut is_protected = true;
         let field_value: String = match entry.fields.get(field_name).unwrap() {
-            Value::Bytes(b) => std::str::from_utf8(b).unwrap().to_string(),
-            // Value::Protected(sec_str) => sec_str.to_string(),
-            Value::Protected(sec_str) => continue,
-            Value::Unprotected(s) => s.to_string(),
+            Value::Bytes(b) => {
+                is_protected = false;
+                std::str::from_utf8(b).unwrap().to_string()
+            }
+            Value::Unprotected(s) => {
+                is_protected = false;
+                s.to_string()
+            }
+            Value::Protected(sec_str) => entry.get(field_name).unwrap().to_string(),
         };
         writer.write::<WriterEvent>(WriterEvent::start_element("String").into());
 
@@ -175,8 +184,20 @@ pub(crate) fn dump_xml_entry<E: std::io::Write>(
         writer.write::<WriterEvent>(WriterEvent::characters(&field_name).into());
         writer.write::<WriterEvent>(WriterEvent::end_element().into());
 
-        writer.write::<WriterEvent>(WriterEvent::start_element("Value").into());
-        writer.write::<WriterEvent>(WriterEvent::characters(&field_value).into());
+        let mut start_element_builder = WriterEvent::start_element("Value");
+        if is_protected {
+            start_element_builder = start_element_builder.attr("Protected", "True");
+        }
+        writer.write::<WriterEvent>(start_element_builder.into());
+
+        if is_protected {
+            let encrypted_value = inner_cipher.encrypt(field_value.as_bytes()).unwrap();
+
+            let protected_value = base64::encode(&encrypted_value);
+            writer.write::<WriterEvent>(WriterEvent::characters(&protected_value).into());
+        } else {
+            writer.write::<WriterEvent>(WriterEvent::characters(&field_value).into());
+        }
         writer.write::<WriterEvent>(WriterEvent::end_element().into());
 
         writer.write::<WriterEvent>(WriterEvent::end_element().into());

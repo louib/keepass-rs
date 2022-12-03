@@ -78,7 +78,7 @@ mod xml_tests {
         assert_eq!(decrypted_entry.get_uuid(), new_entry_uuid);
         assert_eq!(decrypted_entry.get_title(), Some("ASDF"));
         assert_eq!(decrypted_entry.get_username(), Some("ghj"));
-        // assert_eq!(decrypted_entry.get(PASSWORD_FIELD_NAME), Some("klmno"));
+        assert_eq!(decrypted_entry.get(PASSWORD_FIELD_NAME), Some("klmno"));
         assert_eq!(
             decrypted_entry.tags,
             vec!["test".to_string(), "keepass-rs".to_string()]
