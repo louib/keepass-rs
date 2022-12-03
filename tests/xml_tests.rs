@@ -3,7 +3,7 @@ mod xml_tests {
         config::{Compression, InnerCipherSuite, KdfSettings, OuterCipherSuite},
         db::{
             Database, Entry, Group, Header, InnerHeader, Node, KEEPASS_LATEST_ID,
-            USERNAME_FIELD_NAME,
+            PASSWORD_FIELD_NAME, USERNAME_FIELD_NAME,
         },
         key,
         parse::kdbx4::*,
@@ -71,7 +71,7 @@ mod xml_tests {
         assert_eq!(decrypted_entry.get_uuid(), new_entry_uuid);
         assert_eq!(decrypted_entry.get_title(), Some("ASDF"));
         assert_eq!(decrypted_entry.get_username(), Some("ghj"));
-        // assert_eq!(decrypted_entry.get_password(), Some("klmno"));
+        // assert_eq!(decrypted_entry.get(PASSWORD_FIELD_NAME), Some("klmno"));
         assert_eq!(
             decrypted_entry.tags,
             vec!["test".to_string(), "keepass-rs".to_string()]
@@ -83,5 +83,32 @@ mod xml_tests {
         } else {
             // panic!("Expected an ExpiryTime");
         }
+    }
+
+    #[test]
+    pub fn test_database() {
+        let mut db = create_database(
+            OuterCipherSuite::AES256,
+            Compression::GZip,
+            InnerCipherSuite::Salsa20,
+            KdfSettings::Argon2 {
+                salt: vec![],
+                iterations: 1000,
+                memory: 1000,
+                parallelism: 1,
+                version: argon2::Version::Version13,
+            },
+            Group::new("Root"),
+            vec![],
+        );
+
+        let password = "test".to_string();
+        let key_elements = key::get_key_elements(Some(&password), None).unwrap();
+
+        let encrypted_db = dump(&db, &key_elements).unwrap();
+
+        let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
+
+        assert_eq!(decrypted_db.root.children.len(), 0);
     }
 }
