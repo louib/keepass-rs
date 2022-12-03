@@ -1,6 +1,4 @@
 mod kdbx4_tests {
-    use uuid::Uuid;
-
     use keepass::{
         config::{Compression, InnerCipherSuite, KdfSettings, OuterCipherSuite},
         db::{Database, Entry, Group, Header, InnerHeader, Node, KEEPASS_LATEST_ID},
@@ -17,28 +15,18 @@ mod kdbx4_tests {
         inner_cipher_suite: InnerCipherSuite,
         kdf_setting: KdfSettings,
     ) {
+        let mut root_group = Group::new("Root");
+        root_group.children.push(Node::Entry(Entry::new()));
         let mut db = create_database(
             outer_cipher_suite,
             compression,
             inner_cipher_suite,
             kdf_setting,
-            Group {
-                children: vec![Node::Entry(Entry {
-                    uuid: Uuid::new_v4().to_string(),
-                    fields: HashMap::default(),
-                    times: HashMap::default(),
-                    expires: false,
-                    autotype: None,
-                    tags: vec![],
-                })],
-                name: "Root".to_string(),
-                uuid: Uuid::new_v4().to_string(),
-                times: HashMap::default(),
-                expires: false,
-            },
+            root_group,
             vec![],
         );
 
+        // FIXME we should generate a random password here.
         let password = "test".to_string();
         let key_elements = key::get_key_elements(Some(&password), None).unwrap();
 
@@ -193,6 +181,8 @@ mod kdbx4_tests {
 
     #[test]
     pub fn binary_attachments() {
+        let mut root_group = Group::new("Root");
+        root_group.children.push(Node::Entry(Entry::new()));
         let mut db = create_database(
             OuterCipherSuite::AES256,
             Compression::GZip,
@@ -204,20 +194,7 @@ mod kdbx4_tests {
                 parallelism: 1,
                 version: argon2::Version::Version13,
             },
-            Group {
-                children: vec![Node::Entry(Entry {
-                    uuid: Uuid::new_v4().to_string(),
-                    fields: HashMap::default(),
-                    times: HashMap::default(),
-                    expires: false,
-                    autotype: None,
-                    tags: vec![],
-                })],
-                name: "Root".to_string(),
-                uuid: Uuid::new_v4().to_string(),
-                times: HashMap::default(),
-                expires: false,
-            },
+            root_group,
             vec![
                 BinaryAttachment {
                     flags: 1,

@@ -1,5 +1,6 @@
 use secstr::SecStr;
 use std::collections::{HashMap, VecDeque};
+use uuid::Uuid;
 
 use crate::{
     crypt, key,
@@ -341,6 +342,18 @@ pub struct Entry {
     pub times: HashMap<String, chrono::NaiveDateTime>,
     pub tags: Vec<String>,
 }
+impl Entry {
+    pub fn new() -> Entry {
+        Entry {
+            uuid: Uuid::new_v4().to_string(),
+            fields: HashMap::default(),
+            times: HashMap::default(),
+            expires: false,
+            autotype: None,
+            tags: vec![],
+        }
+    }
+}
 
 impl<'a> Entry {
     /// Get a field by name, taking care of unprotecting Protected values automatically
@@ -415,6 +428,18 @@ impl<'a> Iterator for NodeIter<'a> {
         }
 
         Some(head)
+    }
+}
+
+impl Group {
+    pub fn new(name: &str) -> Group {
+        Group {
+            children: vec![],
+            name: name.to_string(),
+            uuid: Uuid::new_v4().to_string(),
+            times: HashMap::default(),
+            expires: false,
+        }
     }
 }
 
