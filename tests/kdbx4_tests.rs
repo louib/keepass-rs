@@ -26,8 +26,14 @@ mod kdbx4_tests {
             vec![],
         );
 
-        // FIXME we should generate a random password here.
-        let password = "test".to_string();
+        let mut password_bytes: Vec<u8> = vec![];
+        let mut password: String = "".to_string();
+        password_bytes.resize(40, 0);
+        getrandom::getrandom(&mut password_bytes);
+        for random_char in password_bytes {
+            password += &std::char::from_u32(random_char as u32).unwrap().to_string();
+        }
+
         let key_elements = key::get_key_elements(Some(&password), None).unwrap();
 
         let encrypted_db = dump(&db, &key_elements).unwrap();
