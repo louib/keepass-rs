@@ -116,7 +116,7 @@ mod kdbx4_tests {
     }
 
     #[test]
-    pub fn kdbx4_with_kdf_argon2_cipher_aes() {
+    pub fn aes256_chacha20_aes() {
         test_with_settings(
             OuterCipherSuite::AES256,
             Compression::GZip,
@@ -129,7 +129,7 @@ mod kdbx4_tests {
     }
 
     #[test]
-    pub fn kdbx4_with_kdf_argon2_cipher_chacha() {
+    pub fn chacha20_chacha20_aes() {
         test_with_settings(
             OuterCipherSuite::ChaCha20,
             Compression::GZip,
@@ -158,7 +158,7 @@ mod kdbx4_tests {
     }
 
     #[test]
-    pub fn kdbx4_with_kdf_argon2_cipher_twofish() {
+    pub fn twofish_chacha20_aes() {
         test_with_settings(
             OuterCipherSuite::Twofish,
             Compression::GZip,
@@ -171,7 +171,7 @@ mod kdbx4_tests {
     }
 
     #[test]
-    pub fn kdbx4_with_no_compression() {
+    pub fn twofish_chacha20_aes_no_compression() {
         test_with_settings(
             OuterCipherSuite::Twofish,
             Compression::None,
@@ -200,7 +200,7 @@ mod kdbx4_tests {
     }
 
     #[test]
-    pub fn kdbx4_with_salsa20() {
+    pub fn aes256_salsa20_aes() {
         test_with_settings(
             OuterCipherSuite::AES256,
             Compression::GZip,
@@ -213,7 +213,7 @@ mod kdbx4_tests {
     }
 
     #[test]
-    pub fn kdbx4_with_argon_kdf() {
+    pub fn aes256_salsa20_argon2() {
         test_with_settings(
             OuterCipherSuite::AES256,
             Compression::GZip,
@@ -229,7 +229,7 @@ mod kdbx4_tests {
     }
 
     #[test]
-    pub fn kdbx4_with_binary_attachments() {
+    pub fn binary_attachments() {
         let mut db = create_database(
             OuterCipherSuite::AES256,
             Compression::GZip,
