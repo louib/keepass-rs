@@ -362,6 +362,7 @@ pub const ROOT_GROUP_NAME: &str = "Root";
 
 pub const USERNAME_FIELD_NAME: &str = "UserName";
 pub const TITLE_FIELD_NAME: &str = "Title";
+pub const TAGS_FIELD_NAME: &str = "Tags";
 pub const PASSWORD_FIELD_NAME: &str = "Password";
 pub const UUID_FIELD_NAME: &str = "UUID";
 

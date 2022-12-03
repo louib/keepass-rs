@@ -8,8 +8,8 @@ use xml::reader::{EventReader, XmlEvent};
 use xml::writer::{EmitterConfig, EventWriter, Result as XmlResult, XmlEvent as WriterEvent};
 
 use super::db::{
-    AutoType, AutoTypeAssociation, Database, Entry, Group, Value, TITLE_FIELD_NAME,
-    USERNAME_FIELD_NAME, UUID_FIELD_NAME,
+    AutoType, AutoTypeAssociation, Database, Entry, Group, Value, TAGS_FIELD_NAME,
+    TITLE_FIELD_NAME, USERNAME_FIELD_NAME, UUID_FIELD_NAME,
 };
 
 #[derive(Debug)]
