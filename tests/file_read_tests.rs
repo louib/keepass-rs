@@ -146,20 +146,6 @@ mod tests {
     }
 
     #[test]
-    fn open_kdbx4_with_password_kdf_argon2_cipher_twofish() -> Result<()> {
-        let path = Path::new("tests/resources/test_db_kdbx4_with_password_argon2_twofish.kdbx");
-
-        let db = Database::open(&mut File::open(path)?, Some("demopass"), None)?;
-
-        println!("{:?} DB Opened", db);
-
-        assert_eq!(db.root.name, "Root");
-        assert_eq!(db.root.children.len(), 1);
-
-        Ok(())
-    }
-
-    #[test]
     fn open_kdbx4_with_password_kdf_argon2_cipher_chacha20() -> Result<()> {
         let path = Path::new("tests/resources/test_db_kdbx4_with_password_argon2_chacha20.kdbx");
 

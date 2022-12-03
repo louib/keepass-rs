@@ -1,4 +1,4 @@
-mod tests {
+mod kdbx4_tests {
     use uuid::Uuid;
 
     use keepass::{
@@ -168,6 +168,22 @@ mod tests {
             KdfSettings::Aes {
                 seed: vec![],
                 rounds: 100,
+            },
+        );
+    }
+
+    #[test]
+    pub fn twofish_chacha_argon() {
+        test_with_settings(
+            OuterCipherSuite::Twofish,
+            Compression::GZip,
+            InnerCipherSuite::ChaCha20,
+            KdfSettings::Argon2 {
+                salt: vec![],
+                iterations: 1000,
+                memory: 134217728,
+                parallelism: 8,
+                version: argon2::Version::Version13,
             },
         );
     }
