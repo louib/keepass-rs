@@ -119,19 +119,6 @@ mod tests {
     }
 
     #[test]
-    fn open_kdbx4_with_password_kdf_aes_cipher_aes() -> Result<()> {
-        let path = Path::new("tests/resources/test_db_kdbx4_with_password_aes.kdbx");
-        let db = Database::open(&mut File::open(path)?, Some("demopass"), None)?;
-
-        println!("{:?} DB Opened", db);
-
-        assert_eq!(db.root.name, "Root");
-        assert_eq!(db.root.children.len(), 1);
-
-        Ok(())
-    }
-
-    #[test]
     fn open_kdbx4_with_keyfile() -> Result<()> {
         let path = Path::new("tests/resources/test_db_kdbx4_with_keyfile.kdbx");
         let kf_path = Path::new("tests/resources/test_key.key");

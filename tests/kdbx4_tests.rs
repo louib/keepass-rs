@@ -129,7 +129,7 @@ mod kdbx4_tests {
     }
 
     #[test]
-    pub fn aes256_chacha20_argon() {
+    pub fn aes256_chacha20_argon2() {
         test_with_settings(
             OuterCipherSuite::AES256,
             Compression::GZip,
@@ -145,10 +145,52 @@ mod kdbx4_tests {
     }
 
     #[test]
+    pub fn aes256_salsa20_aes() {
+        test_with_settings(
+            OuterCipherSuite::AES256,
+            Compression::GZip,
+            InnerCipherSuite::Salsa20,
+            KdfSettings::Aes {
+                seed: vec![],
+                rounds: 100,
+            },
+        );
+    }
+
+    #[test]
+    pub fn aes256_salsa20_argon2() {
+        test_with_settings(
+            OuterCipherSuite::AES256,
+            Compression::GZip,
+            InnerCipherSuite::Salsa20,
+            KdfSettings::Argon2 {
+                salt: vec![],
+                iterations: 1000,
+                memory: 1000,
+                parallelism: 1,
+                version: argon2::Version::Version13,
+            },
+        );
+    }
+
+    #[test]
     pub fn chacha20_chacha20_aes() {
         test_with_settings(
             OuterCipherSuite::ChaCha20,
             Compression::GZip,
+            InnerCipherSuite::ChaCha20,
+            KdfSettings::Aes {
+                seed: vec![],
+                rounds: 100,
+            },
+        );
+    }
+
+    #[test]
+    pub fn chacha20_chacha20_aes_no_compression() {
+        test_with_settings(
+            OuterCipherSuite::ChaCha20,
+            Compression::None,
             InnerCipherSuite::ChaCha20,
             KdfSettings::Aes {
                 seed: vec![],
@@ -200,7 +242,7 @@ mod kdbx4_tests {
     }
 
     #[test]
-    pub fn twofish_chacha_argon() {
+    pub fn twofish_chacha20_argon2() {
         test_with_settings(
             OuterCipherSuite::Twofish,
             Compression::GZip,
@@ -210,35 +252,6 @@ mod kdbx4_tests {
                 iterations: 1000,
                 memory: 134217728,
                 parallelism: 8,
-                version: argon2::Version::Version13,
-            },
-        );
-    }
-
-    #[test]
-    pub fn aes256_salsa20_aes() {
-        test_with_settings(
-            OuterCipherSuite::AES256,
-            Compression::GZip,
-            InnerCipherSuite::Salsa20,
-            KdfSettings::Aes {
-                seed: vec![],
-                rounds: 100,
-            },
-        );
-    }
-
-    #[test]
-    pub fn aes256_salsa20_argon2() {
-        test_with_settings(
-            OuterCipherSuite::AES256,
-            Compression::GZip,
-            InnerCipherSuite::Salsa20,
-            KdfSettings::Argon2 {
-                salt: vec![],
-                iterations: 1000,
-                memory: 1000,
-                parallelism: 1,
                 version: argon2::Version::Version13,
             },
         );
