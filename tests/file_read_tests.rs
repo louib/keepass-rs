@@ -119,20 +119,6 @@ mod tests {
     }
 
     #[test]
-    fn open_kdbx4_with_password_kdf_argon2_cipher_aes() -> Result<()> {
-        let path = Path::new("tests/resources/test_db_kdbx4_with_password_argon2.kdbx");
-
-        let db = Database::open(&mut File::open(path)?, Some("demopass"), None)?;
-
-        println!("{:?} DB Opened", db);
-
-        assert_eq!(db.root.name, "Root");
-        assert_eq!(db.root.children.len(), 2);
-
-        Ok(())
-    }
-
-    #[test]
     fn open_kdbx4_with_password_kdf_aes_cipher_aes() -> Result<()> {
         let path = Path::new("tests/resources/test_db_kdbx4_with_password_aes.kdbx");
         let db = Database::open(&mut File::open(path)?, Some("demopass"), None)?;

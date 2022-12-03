@@ -129,6 +129,22 @@ mod kdbx4_tests {
     }
 
     #[test]
+    pub fn aes256_chacha20_argon() {
+        test_with_settings(
+            OuterCipherSuite::AES256,
+            Compression::GZip,
+            InnerCipherSuite::ChaCha20,
+            KdfSettings::Argon2 {
+                salt: vec![],
+                iterations: 1000,
+                memory: 134217728,
+                parallelism: 8,
+                version: argon2::Version::Version13,
+            },
+        );
+    }
+
+    #[test]
     pub fn chacha20_chacha20_aes() {
         test_with_settings(
             OuterCipherSuite::ChaCha20,
