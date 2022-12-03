@@ -99,12 +99,15 @@ pub(crate) fn dump_xml_group<E: std::io::Write>(
 ) {
     writer.write::<WriterEvent>(WriterEvent::start_element("Group").into());
 
-    // TODO UUID
     // TODO Notes
     // TODO IconId
 
     writer.write::<WriterEvent>(WriterEvent::start_element("Name").into());
     writer.write::<WriterEvent>(WriterEvent::characters(&group.name).into());
+    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+
+    writer.write::<WriterEvent>(WriterEvent::start_element("UUID").into());
+    writer.write::<WriterEvent>(WriterEvent::characters(&group.uuid).into());
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
 
     for child in &group.children {
