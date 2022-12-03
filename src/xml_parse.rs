@@ -7,7 +7,10 @@ use xml::name::OwnedName;
 use xml::reader::{EventReader, XmlEvent};
 use xml::writer::{EmitterConfig, EventWriter, Result as XmlResult, XmlEvent as WriterEvent};
 
-use super::db::{AutoType, AutoTypeAssociation, Database, Entry, Group, Value};
+use super::db::{
+    AutoType, AutoTypeAssociation, Database, Entry, Group, Value, TITLE_FIELD_NAME,
+    USERNAME_FIELD_NAME, UUID_FIELD_NAME,
+};
 
 #[derive(Debug)]
 enum Node {
@@ -21,6 +24,8 @@ enum Node {
     Expires(bool),
     Tags(String),
 }
+
+pub const TAGS_SEPARATION_CHAR: &str = ";";
 
 fn parse_xml_timestamp(t: &str) -> Result<chrono::NaiveDateTime> {
     match chrono::NaiveDateTime::parse_from_str(t, "%Y-%m-%dT%H:%M:%SZ") {
@@ -106,7 +111,7 @@ pub(crate) fn dump_xml_group<E: std::io::Write>(
     writer.write::<WriterEvent>(WriterEvent::characters(&group.name).into());
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
 
-    writer.write::<WriterEvent>(WriterEvent::start_element("UUID").into());
+    writer.write::<WriterEvent>(WriterEvent::start_element(UUID_FIELD_NAME).into());
     writer.write::<WriterEvent>(WriterEvent::characters(&group.uuid).into());
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
 
@@ -126,15 +131,31 @@ pub(crate) fn dump_xml_entry<E: std::io::Write>(
 ) {
     writer.write::<WriterEvent>(WriterEvent::start_element("Entry").into());
 
-    // TODO UUID
     // TODO Notes
     // TODO IconId
-    // TODO Tags
     // TODO Times
     // TODO AutoType
     // TODO History
     // TODO ForegroundColor
     // TODO BackgroundColor
+    //
+    writer.write::<WriterEvent>(WriterEvent::start_element(UUID_FIELD_NAME).into());
+    writer.write::<WriterEvent>(WriterEvent::characters(&entry.uuid).into());
+    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+
+    writer.write::<WriterEvent>(WriterEvent::start_element("Expires").into());
+    if entry.expires {
+        writer.write::<WriterEvent>(WriterEvent::characters("True").into());
+    } else {
+        writer.write::<WriterEvent>(WriterEvent::characters("False").into());
+    }
+    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+
+    writer.write::<WriterEvent>(WriterEvent::start_element("Tags").into());
+    writer.write::<WriterEvent>(
+        WriterEvent::characters(&entry.tags.join(TAGS_SEPARATION_CHAR)).into(),
+    );
+    writer.write::<WriterEvent>(WriterEvent::end_element().into());
 
     for field_name in entry.fields.keys() {
         let field_value: String = match entry.fields.get(field_name).unwrap() {
@@ -340,7 +361,10 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                             if let Some(&mut Node::Entry(Entry { ref mut tags, .. })) =
                                 parsed_stack_head
                             {
-                                *tags = t.split(";").map(|x| x.to_owned()).collect();
+                                *tags = t
+                                    .split(TAGS_SEPARATION_CHAR)
+                                    .map(|x| x.to_owned())
+                                    .collect();
                             }
                         }
                     }

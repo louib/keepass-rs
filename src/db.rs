@@ -355,6 +355,11 @@ impl Entry {
     }
 }
 
+pub const USERNAME_FIELD_NAME: &str = "UserName";
+pub const TITLE_FIELD_NAME: &str = "Title";
+pub const PASSWORD_FIELD_NAME: &str = "Password";
+pub const UUID_FIELD_NAME: &str = "UUID";
+
 impl<'a> Entry {
     /// Get a field by name, taking care of unprotecting Protected values automatically
     pub fn get(&'a self, key: &str) -> Option<&'a str> {
