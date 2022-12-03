@@ -70,11 +70,8 @@ mod kdbx4_tests {
 
         let mut kdf: KdfSettings;
         let mut kdf_seed: Vec<u8> = vec![];
-        let mut kdf_seed_size = kdf_setting.seed_size();
-        for _ in 0..kdf_seed_size {
-            // FIXME obviously this is not random.
-            kdf_seed.push(4);
-        }
+        kdf_seed.resize(kdf_setting.seed_size().into(), 0);
+        getrandom::getrandom(&mut kdf_seed);
 
         let mut master_seed: Vec<u8> = vec![];
         master_seed.resize(keepass::parse::kdbx4::HEADER_MASTER_SEED_SIZE.into(), 0);
