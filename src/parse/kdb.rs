@@ -360,5 +360,6 @@ pub(crate) fn parse(data: &[u8], key_elements: &[Vec<u8>]) -> Result<Database> {
         header: Header::KDB(header),
         inner_header: InnerHeader::None,
         root: root_group,
+        name: None,
     })
 }

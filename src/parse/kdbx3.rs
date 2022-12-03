@@ -1,7 +1,7 @@
 use crate::{
     config::{Compression, InnerCipherSuite, OuterCipherSuite},
     crypt::{self, kdf::Kdf},
-    db::{Database, Group, Header, InnerHeader, Node},
+    db::{Database, Group, Header, InnerHeader, Node, ROOT_GROUP_NAME},
     result::{DatabaseIntegrityError, Error, Result},
     xml_parse,
 };
@@ -173,7 +173,7 @@ pub(crate) fn parse(data: &[u8], key_elements: &[Vec<u8>]) -> Result<Database> {
 
     let mut root = Group {
         uuid: Default::default(),
-        name: "Root".to_owned(),
+        name: ROOT_GROUP_NAME.to_owned(),
         children: Default::default(),
         expires: Default::default(),
         times: Default::default(),
@@ -201,6 +201,7 @@ pub(crate) fn parse(data: &[u8], key_elements: &[Vec<u8>]) -> Result<Database> {
         header: Header::KDBX3(header),
         inner_header: InnerHeader::None,
         root,
+        name: None,
     };
 
     Ok(db)

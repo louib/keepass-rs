@@ -61,7 +61,12 @@ pub(crate) fn dump_database(db: &Database, inner_cipher: &mut dyn Cipher) -> Res
     writer.write::<WriterEvent>(WriterEvent::characters("keepass-rs").into());
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
 
-    // TODO DatabaseName
+    if let Some(db_name) = &db.name {
+        writer.write::<WriterEvent>(WriterEvent::start_element("DatabaseName").into());
+        writer.write::<WriterEvent>(WriterEvent::characters(&db_name).into());
+        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    }
+
     // TODO DatabaseNameChanged
     // TODO DatabaseDescription
     // TODO DatabaseDescriptionChanged
@@ -229,8 +234,8 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                     }
                     "ExpiryTime" => parsed_stack.push(Node::ExpiryTime(String::new())),
                     "Expires" => parsed_stack.push(Node::Expires(bool::default())),
-                    "UUID" => parsed_stack.push(Node::UUID(Default::default())),
-                    "Tags" => parsed_stack.push(Node::Tags(Default::default())),
+                    UUID_FIELD_NAME => parsed_stack.push(Node::UUID(Default::default())),
+                    TAGS_FIELD_NAME => parsed_stack.push(Node::Tags(Default::default())),
                     _ => {}
                 }
             }
@@ -383,13 +388,13 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                     (Some("ExpiryTime"), Some(&mut Node::ExpiryTime(ref mut et))) => {
                         *et = c;
                     }
-                    (Some("UUID"), Some(&mut Node::UUID(ref mut uuid))) => {
+                    (Some(UUID_FIELD_NAME), Some(&mut Node::UUID(ref mut uuid))) => {
                         *uuid = c;
                     }
                     (Some("Expires"), Some(&mut Node::Expires(ref mut es))) => {
                         *es = c == "True";
                     }
-                    (Some("Tags"), Some(&mut Node::Tags(ref mut tags))) => {
+                    (Some(TAGS_FIELD_NAME), Some(&mut Node::Tags(ref mut tags))) => {
                         *tags = c;
                     }
                     (Some("Key"), Some(&mut Node::KeyValue(ref mut k, _))) => {

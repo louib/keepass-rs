@@ -36,6 +36,9 @@ pub struct Database {
 
     /// Root node of the KeePass database
     pub root: Group,
+
+    /// The name of the database.
+    pub name: Option<String>,
 }
 
 /// Identifier for KeePass 1 format.
@@ -354,6 +357,8 @@ impl Entry {
         }
     }
 }
+
+pub const ROOT_GROUP_NAME: &str = "Root";
 
 pub const USERNAME_FIELD_NAME: &str = "UserName";
 pub const TITLE_FIELD_NAME: &str = "Title";

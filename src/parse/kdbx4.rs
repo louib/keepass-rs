@@ -412,6 +412,7 @@ pub fn parse(data: &[u8], key_elements: &[Vec<u8>]) -> Result<Database> {
         header: Header::KDBX4(header),
         inner_header: InnerHeader::KDBX4(inner_header),
         root,
+        name: None,
     };
 
     Ok(db)
@@ -540,5 +541,6 @@ pub fn create_database(
             binaries,
         }),
         root,
+        name: None,
     }
 }
