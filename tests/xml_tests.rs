@@ -72,6 +72,7 @@ mod xml_tests {
         let mut entry = Entry::new();
         let new_entry_uuid = entry.uuid.clone();
         let new_entry_expiry_timestamp = chrono::NaiveDateTime::from_timestamp(404420069755, 0);
+        let new_entry_last_modification = chrono::NaiveDateTime::from_timestamp(40442999999, 0);
 
         entry.fields.insert(
             TITLE_FIELD_NAME.to_string(),
@@ -91,6 +92,10 @@ mod xml_tests {
         entry.times.insert(
             EXPIRY_TIME_FIELD_NAME.to_string(),
             new_entry_expiry_timestamp,
+        );
+        entry.times.insert(
+            "LastModificationTime".to_string(),
+            new_entry_last_modification,
         );
 
         root_group.children.push(Node::Entry(entry));
@@ -145,6 +150,11 @@ mod xml_tests {
             assert_eq!(t.timestamp(), new_entry_expiry_timestamp.timestamp());
         } else {
             panic!("Expected an ExpiryTime");
+        }
+        if let Some(t) = decrypted_entry.get_time("LastModificationTime") {
+            assert_eq!(t.timestamp(), new_entry_last_modification.timestamp());
+        } else {
+            panic!("Expected a LastModificationTime");
         }
     }
 

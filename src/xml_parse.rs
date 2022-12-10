@@ -27,6 +27,7 @@ enum Node {
     AutoTypeAssociation(AutoTypeAssociation),
     DeletionTime(String),
     ExpiryTime(String),
+    LastModificationTime(String),
     Expires(bool),
     Tags(String),
 }
@@ -199,12 +200,14 @@ pub(crate) fn dump_xml_entry<E: std::io::Write>(
     );
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
 
-    if let Some(expiry_time) = &entry.get_expiry_time() {
-        writer.write::<WriterEvent>(WriterEvent::start_element("ExpiryTime").into());
-        writer
-            .write::<WriterEvent>(WriterEvent::characters(&dump_xml_timestamp(expiry_time)).into());
+    writer.write::<WriterEvent>(WriterEvent::start_element("Times").into());
+    for time_name in entry.times.keys() {
+        let time = entry.times.get(time_name).unwrap();
+        writer.write::<WriterEvent>(WriterEvent::start_element(time_name.as_ref()).into());
+        writer.write::<WriterEvent>(WriterEvent::characters(&dump_xml_timestamp(time)).into());
         writer.write::<WriterEvent>(WriterEvent::end_element().into());
     }
+    writer.write::<WriterEvent>(WriterEvent::end_element().into());
 
     for field_name in entry.fields.keys() {
         let mut is_protected = true;
@@ -303,6 +306,9 @@ pub(crate) fn parse_xml_block(
                         parsed_stack.push(Node::AutoTypeAssociation(Default::default()))
                     }
                     "ExpiryTime" => parsed_stack.push(Node::ExpiryTime(String::new())),
+                    "LastModificationTime" => {
+                        parsed_stack.push(Node::LastModificationTime(String::new()))
+                    }
                     "DeletionTime" => parsed_stack.push(Node::DeletionTime(String::new())),
                     "Expires" => parsed_stack.push(Node::Expires(bool::default())),
                     NOTES_FIELD_NAME => parsed_stack.push(Node::GroupNotes(String::new())),
@@ -327,6 +333,7 @@ pub(crate) fn parse_xml_block(
                     "AutoType",
                     "Association",
                     "ExpiryTime",
+                    "LastModificationTime",
                     "Expires",
                     "UUID",
                     "Tags",
@@ -388,6 +395,26 @@ pub(crate) fn parse_xml_block(
                             })) = parsed_stack_head
                             {
                                 associations.push(ata);
+                            }
+                        }
+
+                        Node::LastModificationTime(et) => {
+                            // Currently ingoring any Err() from parse_xml_timestamp()
+                            // Ignoring Err() to avoid possible regressions for existing users
+                            if let Some(&mut Node::Entry(Entry { ref mut times, .. })) =
+                                parsed_stack_head
+                            {
+                                match parse_xml_timestamp(&et) {
+                                    Ok(t) => times.insert("LastModificationTime".to_owned(), t),
+                                    _ => None,
+                                };
+                            } else if let Some(&mut Node::Group(Group { ref mut times, .. })) =
+                                parsed_stack_head
+                            {
+                                match parse_xml_timestamp(&et) {
+                                    Ok(t) => times.insert("LastModificationTime".to_owned(), t),
+                                    _ => None,
+                                };
                             }
                         }
 
@@ -489,6 +516,12 @@ pub(crate) fn parse_xml_block(
                         *name = c;
                     }
                     (Some("ExpiryTime"), Some(&mut Node::ExpiryTime(ref mut et))) => {
+                        *et = c;
+                    }
+                    (
+                        Some("LastModificationTime"),
+                        Some(&mut Node::LastModificationTime(ref mut et)),
+                    ) => {
                         *et = c;
                     }
                     (Some("DeletionTime"), Some(&mut Node::DeletionTime(ref mut dt))) => {
