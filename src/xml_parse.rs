@@ -11,8 +11,8 @@ use xml::reader::{EventReader, XmlEvent};
 use xml::writer::{EmitterConfig, EventWriter, Result as XmlResult, XmlEvent as WriterEvent};
 
 use super::db::{
-    AutoType, AutoTypeAssociation, Database, Entry, Group, Value, TAGS_FIELD_NAME,
-    TITLE_FIELD_NAME, USERNAME_FIELD_NAME, UUID_FIELD_NAME,
+    AutoType, AutoTypeAssociation, Database, Entry, Group, Value, NOTES_FIELD_NAME,
+    TAGS_FIELD_NAME, TITLE_FIELD_NAME, USERNAME_FIELD_NAME, UUID_FIELD_NAME,
 };
 
 #[derive(Debug)]
@@ -20,6 +20,7 @@ enum Node {
     Entry(Entry),
     UUID(String),
     Group(Group),
+    GroupNotes(String),
     KeyValue(String, Value),
     AutoType(AutoType),
     AutoTypeAssociation(AutoTypeAssociation),
@@ -100,6 +101,9 @@ pub(crate) fn dump_database(db: &Database, inner_cipher: &mut dyn Cipher) -> Res
 
     dump_xml_group(&mut writer, &db.root, inner_cipher);
 
+    // TODO dump DeletedObjects. It should be directly in the root element, after
+    // the root group.
+
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
     Ok(data)
@@ -123,6 +127,12 @@ pub(crate) fn dump_xml_group<E: std::io::Write>(
     writer.write::<WriterEvent>(WriterEvent::characters(&group.uuid).into());
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
 
+    if group.notes.len() != 0 {
+        writer.write::<WriterEvent>(WriterEvent::start_element(NOTES_FIELD_NAME).into());
+        writer.write::<WriterEvent>(WriterEvent::characters(&group.notes).into());
+        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    }
+
     for child in &group.children {
         match child {
             crate::Node::Entry(e) => dump_xml_entry(writer, e, inner_cipher),
@@ -139,7 +149,6 @@ pub(crate) fn dump_xml_entry<E: std::io::Write>(
 ) {
     writer.write::<WriterEvent>(WriterEvent::start_element("Entry").into());
 
-    // TODO Notes
     // TODO IconId
     // TODO Times
     // TODO AutoType
@@ -255,6 +264,7 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                     }
                     "ExpiryTime" => parsed_stack.push(Node::ExpiryTime(String::new())),
                     "Expires" => parsed_stack.push(Node::Expires(bool::default())),
+                    NOTES_FIELD_NAME => parsed_stack.push(Node::GroupNotes(String::new())),
                     UUID_FIELD_NAME => parsed_stack.push(Node::UUID(Default::default())),
                     TAGS_FIELD_NAME => parsed_stack.push(Node::Tags(Default::default())),
                     _ => {}
@@ -268,6 +278,7 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
 
                 if [
                     "Group",
+                    NOTES_FIELD_NAME,
                     "Entry",
                     "String",
                     "AutoType",
@@ -393,6 +404,14 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                                     .collect();
                             }
                         }
+
+                        Node::GroupNotes(n) => {
+                            if let Some(&mut Node::Group(Group { ref mut notes, .. })) =
+                                parsed_stack_head
+                            {
+                                *notes = n;
+                            }
+                        }
                     }
                 }
             }
@@ -411,6 +430,9 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                     }
                     (Some(UUID_FIELD_NAME), Some(&mut Node::UUID(ref mut uuid))) => {
                         *uuid = c;
+                    }
+                    (Some(NOTES_FIELD_NAME), Some(&mut Node::GroupNotes(ref mut notes))) => {
+                        *notes = c;
                     }
                     (Some("Expires"), Some(&mut Node::Expires(ref mut es))) => {
                         *es = c == "True";

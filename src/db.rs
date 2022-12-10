@@ -168,6 +168,9 @@ pub struct Group {
 
     /// Does this group expire
     pub expires: bool,
+
+    /// Notes associated with the group
+    pub notes: String,
 }
 
 impl Group {
@@ -361,9 +364,12 @@ impl Entry {
 pub const ROOT_GROUP_NAME: &str = "Root";
 
 pub const USERNAME_FIELD_NAME: &str = "UserName";
+pub const AUTOTYPE_FIELD_NAME: &str = "AutoType";
+pub const EXPIRY_TIME_FIELD_NAME: &str = "AutoType";
 pub const TITLE_FIELD_NAME: &str = "Title";
 pub const TAGS_FIELD_NAME: &str = "Tags";
 pub const PASSWORD_FIELD_NAME: &str = "Password";
+pub const NOTES_FIELD_NAME: &str = "Notes";
 pub const UUID_FIELD_NAME: &str = "UUID";
 
 impl<'a> Entry {
@@ -450,6 +456,7 @@ impl Group {
             uuid: Uuid::new_v4().to_string(),
             times: HashMap::default(),
             expires: false,
+            notes: "".to_string(),
         }
     }
 }

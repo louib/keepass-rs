@@ -177,6 +177,7 @@ pub(crate) fn parse(data: &[u8], key_elements: &[Vec<u8>]) -> Result<Database> {
         children: Default::default(),
         expires: Default::default(),
         times: Default::default(),
+        notes: "".to_string(),
     };
 
     // Parse XML data blocks

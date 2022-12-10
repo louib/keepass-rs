@@ -3,7 +3,7 @@ mod xml_tests {
         config::{Compression, InnerCipherSuite, KdfSettings, OuterCipherSuite},
         db::{
             Database, Entry, Group, Header, InnerHeader, Node, KEEPASS_LATEST_ID,
-            PASSWORD_FIELD_NAME, TITLE_FIELD_NAME, USERNAME_FIELD_NAME,
+            PASSWORD_FIELD_NAME, ROOT_GROUP_NAME, TITLE_FIELD_NAME, USERNAME_FIELD_NAME,
         },
         key,
         parse::kdbx4::*,
@@ -90,5 +90,62 @@ mod xml_tests {
         } else {
             // panic!("Expected an ExpiryTime");
         }
+    }
+
+    #[test]
+    pub fn test_group() {
+        let mut root_group = Group::new(ROOT_GROUP_NAME);
+        let mut entry = Entry::new();
+        let new_entry_uuid = entry.uuid.clone();
+        entry.fields.insert(
+            TITLE_FIELD_NAME.to_string(),
+            keepass::Value::Unprotected("ASDF".to_string()),
+        );
+
+        root_group.children.push(Node::Entry(entry));
+        let root_group_notes = "This is a note related to the root group";
+        root_group.notes = root_group_notes.to_string();
+
+        let mut db = create_database(
+            OuterCipherSuite::AES256,
+            Compression::GZip,
+            InnerCipherSuite::Salsa20,
+            KdfSettings::Argon2 {
+                salt: vec![],
+                iterations: 1000,
+                memory: 1000,
+                parallelism: 1,
+                version: argon2::Version::Version13,
+            },
+            root_group,
+            vec![],
+        );
+
+        let mut password_bytes: Vec<u8> = vec![];
+        let mut password: String = "".to_string();
+        password_bytes.resize(40, 0);
+        getrandom::getrandom(&mut password_bytes);
+        for random_char in password_bytes {
+            password += &std::char::from_u32(random_char as u32).unwrap().to_string();
+        }
+
+        let key_elements = key::get_key_elements(Some(&password), None).unwrap();
+
+        let encrypted_db = dump(&db, &key_elements).unwrap();
+
+        let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
+
+        assert_eq!(decrypted_db.root.children.len(), 1);
+
+        let decrypted_entry = match &decrypted_db.root.children[0] {
+            Node::Entry(e) => e,
+            Node::Group(g) => panic!("Was expecting an entry as the only child."),
+        };
+
+        assert_eq!(decrypted_entry.get_title(), Some("ASDF"));
+
+        let decrypted_root_group = &decrypted_db.root;
+        assert_eq!(decrypted_root_group.notes, root_group_notes);
+        assert_eq!(decrypted_root_group.name, ROOT_GROUP_NAME);
     }
 }
