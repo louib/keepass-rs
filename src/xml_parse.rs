@@ -31,30 +31,30 @@ enum Node {
 
 pub const TAGS_SEPARATION_CHAR: &str = ";";
 
+/// In KDBX4, timestamps are stored as seconds, Base64 encoded, since 0001-01-01 00:00:00.
+/// This function returns the epoch baseline used by KDBX for date serialization.
+fn get_epoch_baseline() -> chrono::NaiveDateTime {
+    chrono::NaiveDateTime::parse_from_str("0001-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S").unwrap()
+}
+
 fn parse_xml_timestamp(t: &str) -> Result<chrono::NaiveDateTime> {
     match chrono::NaiveDateTime::parse_from_str(t, "%Y-%m-%dT%H:%M:%SZ") {
         // Prior to KDBX4 file format, timestamps were stored as ISO 8601 strings
         Ok(ndt) => Ok(ndt),
-        // In KDBX4, timestamps are stored as seconds, Base64 encoded, since 0001-01-01 00:00:00
-        // So, if we don't have a valid ISO 8601 string, assume we have found a Base64 encoded int.
+        // If we don't have a valid ISO 8601 string, assume we have found a Base64 encoded int.
         _ => {
             let v = base64::decode(t).map_err(|e| Error::from(DatabaseIntegrityError::from(e)))?;
             // Cast the Vec created by base64::decode into the array expected by i64::from_le_bytes
             let mut a: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
             a.copy_from_slice(&v[0..8]);
-            let ndt =
-                chrono::NaiveDateTime::parse_from_str("0001-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S")
-                    .unwrap()
-                    + chrono::Duration::seconds(i64::from_le_bytes(a));
+            let ndt = get_epoch_baseline() + chrono::Duration::seconds(i64::from_le_bytes(a));
             Ok(ndt)
         }
     }
 }
 
 fn dump_xml_timestamp(timestamp: &chrono::NaiveDateTime) -> String {
-    let timestamp_baseline =
-        chrono::NaiveDateTime::parse_from_str("0001-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S").unwrap();
-    let timestamp = timestamp.timestamp() - timestamp_baseline.timestamp();
+    let timestamp = timestamp.timestamp() - get_epoch_baseline().timestamp();
     let timestamp_bytes = i64::to_le_bytes(timestamp);
     base64::encode(timestamp_bytes)
 }
