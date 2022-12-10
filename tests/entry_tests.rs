@@ -51,30 +51,4 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    fn kdbx4_entry() -> Result<()> {
-        // KDBX4 database format Base64 encodes ExpiryTime (and all other XML timestamps)
-        let path = Path::new("tests/resources/test_db_kdbx4_with_password_aes.kdbx");
-        let db = Database::open(&mut File::open(path)?, Some("demopass"), None)?;
-
-        // get an entry on the root node
-        if let Some(NodeRef::Entry(e)) = db.root.get(&["ASDF"]) {
-            assert_eq!(e.get_uuid(), "TzgWvYMwSGWHn6EIoS8oXA==");
-            assert_eq!(e.get_title(), Some("ASDF"));
-            assert_eq!(e.get_username(), Some("ghj"));
-            assert_eq!(e.get_password(), Some("klmno"));
-            assert_eq!(e.tags, vec!["test".to_string(), "keepass-rs".to_string()]);
-            assert_eq!(e.expires, true);
-            if let Some(t) = e.get_time("ExpiryTime") {
-                assert_eq!(format!("{}", t), "2021-04-10 16:53:18");
-            } else {
-                panic!("Expected an ExpiryTime");
-            }
-        } else {
-            panic!("Expected an entry");
-        }
-
-        Ok(())
-    }
 }
