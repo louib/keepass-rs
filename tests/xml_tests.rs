@@ -19,7 +19,7 @@ mod xml_tests {
         let mut root_group = Group::new(ROOT_GROUP_NAME);
         let mut entry = Entry::new();
         let new_entry_uuid = entry.uuid.clone();
-        let new_entry_expiry_timestamp: i64 = 404420069755;
+        let new_entry_expiry_timestamp = chrono::NaiveDateTime::from_timestamp(404420069755, 0);
 
         entry.fields.insert(
             TITLE_FIELD_NAME.to_string(),
@@ -38,7 +38,7 @@ mod xml_tests {
         entry.expires = true;
         entry.times.insert(
             EXPIRY_TIME_FIELD_NAME.to_string(),
-            chrono::NaiveDateTime::from_timestamp(new_entry_expiry_timestamp, 0),
+            new_entry_expiry_timestamp,
         );
 
         root_group.children.push(Node::Entry(entry));
@@ -90,8 +90,7 @@ mod xml_tests {
 
         assert_eq!(decrypted_entry.expires, true);
         if let Some(t) = decrypted_entry.get_expiry_time() {
-            // FIXME this is not quite working yet.
-            // assert_eq!(t.timestamp(), new_entry_expiry_timestamp);
+            assert_eq!(t.timestamp(), new_entry_expiry_timestamp.timestamp());
         } else {
             panic!("Expected an ExpiryTime");
         }

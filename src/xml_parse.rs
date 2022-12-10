@@ -52,7 +52,9 @@ fn parse_xml_timestamp(t: &str) -> Result<chrono::NaiveDateTime> {
 }
 
 fn dump_xml_timestamp(timestamp: &chrono::NaiveDateTime) -> String {
-    let timestamp = timestamp.timestamp();
+    let timestamp_baseline =
+        chrono::NaiveDateTime::parse_from_str("0001-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S").unwrap();
+    let timestamp = timestamp.timestamp() - timestamp_baseline.timestamp();
     let timestamp_bytes = i64::to_le_bytes(timestamp);
     base64::encode(timestamp_bytes)
 }
