@@ -25,9 +25,7 @@ pub fn get_key_elements(
     }
 
     if key_elements.is_empty() {
-        // FIXME this should return more specific errors.
-        // return Err(result::Error::IncorrectKey {});
-        // FIXME this breaks the tests for now.
+        return Err(result::Error::IncorrectKey {});
     }
 
     Ok(key_elements)
