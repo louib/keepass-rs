@@ -17,6 +17,8 @@ mod kdbx4_tests {
     ) {
         let mut root_group = Group::new("Root");
         root_group.children.push(Node::Entry(Entry::new()));
+        root_group.children.push(Node::Entry(Entry::new()));
+        root_group.children.push(Node::Entry(Entry::new()));
         let mut db = create_database(
             outer_cipher_suite,
             compression,
@@ -40,7 +42,7 @@ mod kdbx4_tests {
 
         let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
 
-        assert_eq!(decrypted_db.root.children.len(), 1);
+        assert_eq!(decrypted_db.root.children.len(), 3);
     }
 
     #[test]

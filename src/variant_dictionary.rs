@@ -8,6 +8,14 @@ pub(crate) struct VariantDictionary {
     pub data: HashMap<String, VariantDictionaryValue>,
 }
 
+pub const U32_TYPE_ID: u8 = 0x04;
+pub const U64_TYPE_ID: u8 = 0x05;
+pub const BOOL_TYPE_ID: u8 = 0x08;
+pub const I32_TYPE_ID: u8 = 0x0c;
+pub const I64_TYPE_ID: u8 = 0x0d;
+pub const STR_TYPE_ID: u8 = 0x18;
+pub const BYTES_TYPE_ID: u8 = 0x42;
+
 impl VariantDictionary {
     pub(crate) fn parse(buffer: &[u8]) -> Result<VariantDictionary> {
         let version = LittleEndian::read_u16(&buffer[0..2]);
@@ -38,17 +46,17 @@ impl VariantDictionary {
             pos += value_length;
 
             let value = match value_type {
-                0x04 => VariantDictionaryValue::UInt32(LittleEndian::read_u32(value_buffer)),
-                0x05 => VariantDictionaryValue::UInt64(LittleEndian::read_u64(value_buffer)),
-                0x08 => VariantDictionaryValue::Bool(value_buffer != [0]),
-                0x0c => VariantDictionaryValue::Int32(LittleEndian::read_i32(value_buffer)),
-                0x0d => VariantDictionaryValue::Int64(LittleEndian::read_i64(value_buffer)),
-                0x18 => VariantDictionaryValue::String(
+                U32_TYPE_ID => VariantDictionaryValue::UInt32(LittleEndian::read_u32(value_buffer)),
+                U64_TYPE_ID => VariantDictionaryValue::UInt64(LittleEndian::read_u64(value_buffer)),
+                BOOL_TYPE_ID => VariantDictionaryValue::Bool(value_buffer != [0]),
+                I32_TYPE_ID => VariantDictionaryValue::Int32(LittleEndian::read_i32(value_buffer)),
+                I64_TYPE_ID => VariantDictionaryValue::Int64(LittleEndian::read_i64(value_buffer)),
+                STR_TYPE_ID => VariantDictionaryValue::String(
                     std::str::from_utf8(value_buffer)
                         .map_err(|e| Error::from(DatabaseIntegrityError::from(e)))?
                         .into(),
                 ),
-                0x42 => VariantDictionaryValue::ByteArray(value_buffer.to_vec()),
+                BYTES_TYPE_ID => VariantDictionaryValue::ByteArray(value_buffer.to_vec()),
                 _ => {
                     return Err(DatabaseIntegrityError::InvalidVariantDictionaryValueType {
                         value_type,
@@ -77,12 +85,12 @@ impl VariantDictionary {
                 VariantDictionaryValue::UInt32(value) => {
                     field_buffer.resize(4, 0);
                     LittleEndian::write_u32(&mut field_buffer, value.clone());
-                    0x04
+                    U32_TYPE_ID
                 }
                 VariantDictionaryValue::UInt64(value) => {
                     field_buffer.resize(8, 0);
                     LittleEndian::write_u64(&mut field_buffer, value.clone());
-                    0x05
+                    U64_TYPE_ID
                 }
                 VariantDictionaryValue::Bool(value) => {
                     if *value {
@@ -90,25 +98,25 @@ impl VariantDictionary {
                     } else {
                         field_buffer.push(0);
                     }
-                    0x08
+                    BOOL_TYPE_ID
                 }
                 VariantDictionaryValue::Int32(value) => {
                     field_buffer.resize(4, 0);
                     LittleEndian::write_i32(&mut field_buffer, value.clone());
-                    0x0c
+                    I32_TYPE_ID
                 }
                 VariantDictionaryValue::Int64(value) => {
                     field_buffer.resize(8, 0);
                     LittleEndian::write_i64(&mut field_buffer, value.clone());
-                    0x0d
+                    I64_TYPE_ID
                 }
                 VariantDictionaryValue::String(value) => {
                     field_buffer = value.to_owned().into_bytes();
-                    0x18
+                    STR_TYPE_ID
                 }
                 VariantDictionaryValue::ByteArray(value) => {
                     field_buffer = value.to_vec();
-                    0x42
+                    BYTES_TYPE_ID
                 }
             };
 
