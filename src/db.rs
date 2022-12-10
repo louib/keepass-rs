@@ -365,7 +365,7 @@ pub const ROOT_GROUP_NAME: &str = "Root";
 
 pub const USERNAME_FIELD_NAME: &str = "UserName";
 pub const AUTOTYPE_FIELD_NAME: &str = "AutoType";
-pub const EXPIRY_TIME_FIELD_NAME: &str = "AutoType";
+pub const EXPIRY_TIME_FIELD_NAME: &str = "ExpiryTime";
 pub const TITLE_FIELD_NAME: &str = "Title";
 pub const TAGS_FIELD_NAME: &str = "Tags";
 pub const PASSWORD_FIELD_NAME: &str = "Password";
@@ -410,7 +410,7 @@ impl<'a> Entry {
     /// Convenience method for getting the value of the 'ExpiryTime' timestamp
     /// This value is usually only meaningful/useful when expires == true
     pub fn get_expiry_time(&self) -> Option<&chrono::NaiveDateTime> {
-        self.get_time("ExpiryTime")
+        self.get_time(EXPIRY_TIME_FIELD_NAME)
     }
 
     /// Convenience method for getting the value of the 'Title' field

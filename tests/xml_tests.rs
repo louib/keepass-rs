@@ -2,8 +2,9 @@ mod xml_tests {
     use keepass::{
         config::{Compression, InnerCipherSuite, KdfSettings, OuterCipherSuite},
         db::{
-            Database, Entry, Group, Header, InnerHeader, Node, KEEPASS_LATEST_ID,
-            PASSWORD_FIELD_NAME, ROOT_GROUP_NAME, TITLE_FIELD_NAME, USERNAME_FIELD_NAME,
+            Database, Entry, Group, Header, InnerHeader, Node, EXPIRY_TIME_FIELD_NAME,
+            KEEPASS_LATEST_ID, PASSWORD_FIELD_NAME, ROOT_GROUP_NAME, TITLE_FIELD_NAME,
+            USERNAME_FIELD_NAME,
         },
         key,
         parse::kdbx4::*,
@@ -15,9 +16,11 @@ mod xml_tests {
 
     #[test]
     pub fn test_entry() {
-        let mut root_group = Group::new("Root");
+        let mut root_group = Group::new(ROOT_GROUP_NAME);
         let mut entry = Entry::new();
         let new_entry_uuid = entry.uuid.clone();
+        let new_entry_expiry_timestamp: i64 = 404420069755;
+
         entry.fields.insert(
             TITLE_FIELD_NAME.to_string(),
             keepass::Value::Unprotected("ASDF".to_string()),
@@ -33,9 +36,10 @@ mod xml_tests {
         entry.tags.push("test".to_string());
         entry.tags.push("keepass-rs".to_string());
         entry.expires = true;
-
-        // Add an assertion that ExpiryTime.
-        // assert_eq!(format!("{}", t), "2021-04-10 16:53:18");
+        entry.times.insert(
+            EXPIRY_TIME_FIELD_NAME.to_string(),
+            chrono::NaiveDateTime::from_timestamp(new_entry_expiry_timestamp, 0),
+        );
 
         root_group.children.push(Node::Entry(entry));
 
@@ -83,12 +87,13 @@ mod xml_tests {
             decrypted_entry.tags,
             vec!["test".to_string(), "keepass-rs".to_string()]
         );
+
         assert_eq!(decrypted_entry.expires, true);
-        if let Some(t) = decrypted_entry.get_time("ExpiryTime") {
-            // TODO enable that check
-            // assert_eq!(format!("{}", t), "2021-04-10 16:53:18");
+        if let Some(t) = decrypted_entry.get_expiry_time() {
+            // FIXME this is not quite working yet.
+            // assert_eq!(t.timestamp(), new_entry_expiry_timestamp);
         } else {
-            // panic!("Expected an ExpiryTime");
+            panic!("Expected an ExpiryTime");
         }
     }
 

@@ -51,6 +51,12 @@ fn parse_xml_timestamp(t: &str) -> Result<chrono::NaiveDateTime> {
     }
 }
 
+fn dump_xml_timestamp(timestamp: &chrono::NaiveDateTime) -> String {
+    let timestamp = timestamp.timestamp();
+    let timestamp_bytes = i64::to_le_bytes(timestamp);
+    base64::encode(timestamp_bytes)
+}
+
 pub(crate) fn dump_database(db: &Database, inner_cipher: &mut dyn Cipher) -> Result<Vec<u8>> {
     let mut data: Vec<u8> = vec![];
     let mut writer = EmitterConfig::new()
@@ -173,6 +179,13 @@ pub(crate) fn dump_xml_entry<E: std::io::Write>(
         WriterEvent::characters(&entry.tags.join(TAGS_SEPARATION_CHAR)).into(),
     );
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
+
+    if let Some(expiry_time) = &entry.get_expiry_time() {
+        writer.write::<WriterEvent>(WriterEvent::start_element("ExpiryTime").into());
+        writer
+            .write::<WriterEvent>(WriterEvent::characters(&dump_xml_timestamp(expiry_time)).into());
+        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    }
 
     for field_name in entry.fields.keys() {
         let mut is_protected = true;
