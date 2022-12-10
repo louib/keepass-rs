@@ -75,12 +75,9 @@ impl Cipher for TwofishCipher {
         let cipher = TwofishCbc::new_from_slices(&self.key, &self.iv)
             .map_err(|e| Error::from(DatabaseIntegrityError::from(CryptoError::from(e))))?;
 
-        let mut buf = ciphertext.to_vec();
         cipher
-            .decrypt(&mut buf)
-            .map_err(|e| Error::from(DatabaseIntegrityError::from(CryptoError::from(e))))?;
-
-        Ok(buf)
+            .decrypt_vec(&ciphertext)
+            .map_err(|e| Error::from(DatabaseIntegrityError::from(CryptoError::from(e))))
     }
     fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>> {
         let cipher = TwofishCbc::new_from_slices(&self.key, &self.iv)

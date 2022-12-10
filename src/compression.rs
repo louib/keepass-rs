@@ -16,9 +16,7 @@ impl Decompress for NoCompression {
         Ok(in_buffer.to_vec())
     }
     fn decompress(&self, in_buffer: &[u8]) -> Result<Vec<u8>> {
-        // FIXME not sure it's the best way to deal with trailing spaces when no compression.
-        let mut trimmed_buffer = std::str::from_utf8(&in_buffer).unwrap().trim();
-        Ok(trimmed_buffer.as_bytes().to_vec())
+        Ok(in_buffer.to_vec())
     }
 }
 
