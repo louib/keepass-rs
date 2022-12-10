@@ -362,5 +362,6 @@ pub(crate) fn parse(data: &[u8], key_elements: &[Vec<u8>]) -> Result<Database> {
         inner_header: InnerHeader::None,
         root: root_group,
         name: None,
+        deleted_objects: vec![],
     })
 }

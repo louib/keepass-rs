@@ -25,6 +25,16 @@ pub enum InnerHeader {
     KDBX4(KDBX4InnerHeader),
 }
 
+/// An item (group or entry) that was deleted from
+/// the database completely.
+#[derive(Debug)]
+pub struct DeletedObject {
+    /// The unique identifier of the deleted object.
+    pub uuid: String,
+
+    pub deletion_time: chrono::NaiveDateTime,
+}
+
 /// A decrypted KeePass database
 #[derive(Debug)]
 pub struct Database {
@@ -39,6 +49,8 @@ pub struct Database {
 
     /// The name of the database.
     pub name: Option<String>,
+
+    pub deleted_objects: Vec<DeletedObject>,
 }
 
 /// Identifier for KeePass 1 format.

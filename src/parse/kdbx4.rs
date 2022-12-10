@@ -406,13 +406,14 @@ pub fn parse(data: &[u8], key_elements: &[Vec<u8>]) -> Result<Database> {
         .inner_random_stream
         .get_cipher(&inner_header.inner_random_stream_key)?;
 
-    let root = xml_parse::parse_xml_block(&xml, &mut *inner_decryptor)?;
+    let (root, deleted_objects) = xml_parse::parse_xml_block(&xml, &mut *inner_decryptor)?;
 
     let db = Database {
         header: Header::KDBX4(header),
         inner_header: InnerHeader::KDBX4(inner_header),
         root,
         name: None,
+        deleted_objects,
     };
 
     Ok(db)
@@ -474,6 +475,7 @@ pub(crate) fn decrypt_xml(
 
     // after inner header is one XML document
     let xml = &payload[xml_start..];
+    // panic!("{:?}", std::str::from_utf8(&xml));
 
     Ok((header, inner_header, xml.to_vec()))
 }
@@ -541,5 +543,6 @@ pub fn create_database(
         }),
         root,
         name: None,
+        deleted_objects: vec![],
     }
 }

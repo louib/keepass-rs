@@ -182,7 +182,7 @@ pub(crate) fn parse(data: &[u8], key_elements: &[Vec<u8>]) -> Result<Database> {
 
     // Parse XML data blocks
     for block_buffer in xml_blocks {
-        let block_group = xml_parse::parse_xml_block(&block_buffer, &mut *inner_decryptor)?;
+        let (block_group, _) = xml_parse::parse_xml_block(&block_buffer, &mut *inner_decryptor)?;
         root.children.push(Node::Group(block_group));
     }
 
@@ -203,6 +203,7 @@ pub(crate) fn parse(data: &[u8], key_elements: &[Vec<u8>]) -> Result<Database> {
         inner_header: InnerHeader::None,
         root,
         name: None,
+        deleted_objects: vec![],
     };
 
     Ok(db)

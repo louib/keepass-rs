@@ -11,7 +11,7 @@ use xml::reader::{EventReader, XmlEvent};
 use xml::writer::{EmitterConfig, EventWriter, Result as XmlResult, XmlEvent as WriterEvent};
 
 use super::db::{
-    AutoType, AutoTypeAssociation, Database, Entry, Group, Value, NOTES_FIELD_NAME,
+    AutoType, AutoTypeAssociation, Database, DeletedObject, Entry, Group, Value, NOTES_FIELD_NAME,
     TAGS_FIELD_NAME, TITLE_FIELD_NAME, USERNAME_FIELD_NAME, UUID_FIELD_NAME,
 };
 
@@ -20,10 +20,12 @@ enum Node {
     Entry(Entry),
     UUID(String),
     Group(Group),
+    DeletedObject(DeletedObject),
     GroupNotes(String),
     KeyValue(String, Value),
     AutoType(AutoType),
     AutoTypeAssociation(AutoTypeAssociation),
+    DeletionTime(String),
     ExpiryTime(String),
     Expires(bool),
     Tags(String),
@@ -106,13 +108,29 @@ pub(crate) fn dump_database(db: &Database, inner_cipher: &mut dyn Cipher) -> Res
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
 
     writer.write::<WriterEvent>(WriterEvent::start_element("Root").into());
-
     dump_xml_group(&mut writer, &db.root, inner_cipher);
-
-    // TODO dump DeletedObjects. It should be directly in the root element, after
-    // the root group.
-
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
+
+    if db.deleted_objects.len() != 0 {
+        writer.write::<WriterEvent>(WriterEvent::start_element("DeletedObjects").into());
+        for deleted_object in &db.deleted_objects {
+            writer.write::<WriterEvent>(WriterEvent::start_element("DeletedObject").into());
+
+            writer.write::<WriterEvent>(WriterEvent::start_element(UUID_FIELD_NAME).into());
+            writer.write::<WriterEvent>(WriterEvent::characters(&deleted_object.uuid).into());
+            writer.write::<WriterEvent>(WriterEvent::end_element().into());
+
+            writer.write::<WriterEvent>(WriterEvent::start_element("DeletionTime").into());
+            writer.write::<WriterEvent>(
+                WriterEvent::characters(&dump_xml_timestamp(&deleted_object.deletion_time)).into(),
+            );
+            writer.write::<WriterEvent>(WriterEvent::end_element().into());
+
+            writer.write::<WriterEvent>(WriterEvent::end_element().into());
+        }
+        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    }
+
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
     Ok(data)
 }
@@ -124,7 +142,6 @@ pub(crate) fn dump_xml_group<E: std::io::Write>(
 ) {
     writer.write::<WriterEvent>(WriterEvent::start_element("Group").into());
 
-    // TODO Notes
     // TODO IconId
 
     writer.write::<WriterEvent>(WriterEvent::start_element("Name").into());
@@ -230,7 +247,10 @@ pub(crate) fn dump_xml_entry<E: std::io::Write>(
     writer.write::<WriterEvent>(WriterEvent::end_element().into());
 }
 
-pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Result<Group> {
+pub(crate) fn parse_xml_block(
+    xml: &[u8],
+    inner_cipher: &mut dyn Cipher,
+) -> Result<(Group, Vec<DeletedObject>)> {
     let parser = EventReader::new(xml);
 
     // Stack of parsed Node objects not yet associated with their parent
@@ -240,6 +260,7 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
     let mut xml_stack: Vec<String> = vec![];
 
     let mut root_group: Group = Default::default();
+    let mut deleted_objects: Vec<DeletedObject> = vec![];
 
     for e in parser {
         match e.unwrap() {
@@ -253,6 +274,10 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                 match &local_name[..] {
                     "Group" => parsed_stack.push(Node::Group(Default::default())),
                     "Entry" => parsed_stack.push(Node::Entry(Default::default())),
+                    "DeletedObject" => parsed_stack.push(Node::DeletedObject(DeletedObject {
+                        uuid: "".to_string(),
+                        deletion_time: chrono::NaiveDateTime::from_timestamp(0, 0),
+                    })),
                     "String" => parsed_stack.push(Node::KeyValue(
                         String::new(),
                         Value::Unprotected(String::new()),
@@ -278,6 +303,7 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                         parsed_stack.push(Node::AutoTypeAssociation(Default::default()))
                     }
                     "ExpiryTime" => parsed_stack.push(Node::ExpiryTime(String::new())),
+                    "DeletionTime" => parsed_stack.push(Node::DeletionTime(String::new())),
                     "Expires" => parsed_stack.push(Node::Expires(bool::default())),
                     NOTES_FIELD_NAME => parsed_stack.push(Node::GroupNotes(String::new())),
                     UUID_FIELD_NAME => parsed_stack.push(Node::UUID(Default::default())),
@@ -295,6 +321,8 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                     "Group",
                     NOTES_FIELD_NAME,
                     "Entry",
+                    "DeletedObject",
+                    "DeletionTime",
                     "String",
                     "AutoType",
                     "Association",
@@ -406,6 +434,22 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                                 parsed_stack_head
                             {
                                 *uuid = u;
+                            } else if let Some(&mut Node::DeletedObject(DeletedObject {
+                                ref mut uuid,
+                                ..
+                            })) = parsed_stack_head
+                            {
+                                *uuid = u;
+                            }
+                        }
+
+                        Node::DeletionTime(dt) => {
+                            if let Some(&mut Node::DeletedObject(DeletedObject {
+                                ref mut deletion_time,
+                                ..
+                            })) = parsed_stack_head
+                            {
+                                *deletion_time = parse_xml_timestamp(&dt).unwrap();
                             }
                         }
 
@@ -418,6 +462,10 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                                     .map(|x| x.to_owned())
                                     .collect();
                             }
+                        }
+
+                        Node::DeletedObject(finished_deleted_object) => {
+                            deleted_objects.push(finished_deleted_object);
                         }
 
                         Node::GroupNotes(n) => {
@@ -442,6 +490,9 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
                     }
                     (Some("ExpiryTime"), Some(&mut Node::ExpiryTime(ref mut et))) => {
                         *et = c;
+                    }
+                    (Some("DeletionTime"), Some(&mut Node::DeletionTime(ref mut dt))) => {
+                        *dt = c;
                     }
                     (Some(UUID_FIELD_NAME), Some(&mut Node::UUID(ref mut uuid))) => {
                         *uuid = c;
@@ -508,5 +559,5 @@ pub(crate) fn parse_xml_block(xml: &[u8], inner_cipher: &mut dyn Cipher) -> Resu
         }
     }
 
-    Ok(root_group)
+    Ok((root_group, deleted_objects))
 }

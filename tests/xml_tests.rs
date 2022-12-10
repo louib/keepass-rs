@@ -2,9 +2,9 @@ mod xml_tests {
     use keepass::{
         config::{Compression, InnerCipherSuite, KdfSettings, OuterCipherSuite},
         db::{
-            Database, Entry, Group, Header, InnerHeader, Node, EXPIRY_TIME_FIELD_NAME,
-            KEEPASS_LATEST_ID, PASSWORD_FIELD_NAME, ROOT_GROUP_NAME, TITLE_FIELD_NAME,
-            USERNAME_FIELD_NAME,
+            Database, DeletedObject, Entry, Group, Header, InnerHeader, Node,
+            EXPIRY_TIME_FIELD_NAME, KEEPASS_LATEST_ID, PASSWORD_FIELD_NAME, ROOT_GROUP_NAME,
+            TITLE_FIELD_NAME, USERNAME_FIELD_NAME,
         },
         key,
         parse::kdbx4::*,
@@ -13,6 +13,58 @@ mod xml_tests {
 
     use std::collections::HashMap;
     use std::{fs::File, path::Path};
+
+    #[test]
+    pub fn test_deleted_objects() {
+        let deleted_entry_uuid = Entry::new().uuid.clone();
+        let deleted_entry_deletion_time = 56565656;
+
+        let mut db = create_database(
+            OuterCipherSuite::AES256,
+            Compression::GZip,
+            InnerCipherSuite::Salsa20,
+            KdfSettings::Argon2 {
+                salt: vec![],
+                iterations: 1000,
+                memory: 1000,
+                parallelism: 1,
+                version: argon2::Version::Version13,
+            },
+            Group::new(ROOT_GROUP_NAME),
+            vec![],
+        );
+
+        db.deleted_objects.push(DeletedObject {
+            uuid: deleted_entry_uuid.clone(),
+            deletion_time: chrono::NaiveDateTime::from_timestamp(deleted_entry_deletion_time, 0),
+        });
+
+        let mut password_bytes: Vec<u8> = vec![];
+        let mut password: String = "".to_string();
+        password_bytes.resize(40, 0);
+        getrandom::getrandom(&mut password_bytes);
+        for random_char in password_bytes {
+            password += &std::char::from_u32(random_char as u32).unwrap().to_string();
+        }
+
+        let key_elements = key::get_key_elements(Some(&password), None).unwrap();
+
+        let encrypted_db = dump(&db, &key_elements).unwrap();
+
+        let decrypted_db = parse(&encrypted_db, &key_elements).unwrap();
+
+        assert_eq!(decrypted_db.root.children.len(), 0);
+
+        assert_eq!(decrypted_db.deleted_objects.len(), 1);
+        assert_eq!(
+            decrypted_db.deleted_objects[0].uuid.clone(),
+            deleted_entry_uuid
+        );
+        assert_eq!(
+            decrypted_db.deleted_objects[0].deletion_time.timestamp(),
+            deleted_entry_deletion_time,
+        );
+    }
 
     #[test]
     pub fn test_entry() {
