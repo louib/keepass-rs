@@ -126,7 +126,7 @@ impl Database {
         password: Option<&str>,
         keyfile: Option<&mut dyn std::io::Read>,
     ) -> Result<Vec<Vec<u8>>> {
-        let mut key_elements = key::get_key_elements(password, keyfile)?;
+        let key_elements = key::get_key_elements(password, keyfile)?;
 
         let mut data = Vec::new();
         source.read_to_end(&mut data)?;

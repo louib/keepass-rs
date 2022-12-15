@@ -1,13 +1,10 @@
 mod kdbx4_tests {
     use keepass::{
         config::{Compression, InnerCipherSuite, KdfSettings, OuterCipherSuite},
-        db::{Database, Entry, Group, Header, InnerHeader, Node, KEEPASS_LATEST_ID},
+        db::{Entry, Group, Node},
         key,
         parse::kdbx4::*,
     };
-
-    use std::collections::HashMap;
-    use std::{fs::File, path::Path};
 
     fn test_with_settings(
         outer_cipher_suite: OuterCipherSuite,
@@ -19,19 +16,20 @@ mod kdbx4_tests {
         root_group.children.push(Node::Entry(Entry::new()));
         root_group.children.push(Node::Entry(Entry::new()));
         root_group.children.push(Node::Entry(Entry::new()));
-        let mut db = create_database(
+        let db = create_database(
             outer_cipher_suite,
             compression,
             inner_cipher_suite,
             kdf_setting,
             root_group,
             vec![],
-        );
+        )
+        .unwrap();
 
         let mut password_bytes: Vec<u8> = vec![];
         let mut password: String = "".to_string();
         password_bytes.resize(40, 0);
-        getrandom::getrandom(&mut password_bytes);
+        getrandom::getrandom(&mut password_bytes).unwrap();
         for random_char in password_bytes {
             password += &std::char::from_u32(random_char as u32).unwrap().to_string();
         }
@@ -223,7 +221,7 @@ mod kdbx4_tests {
     pub fn binary_attachments() {
         let mut root_group = Group::new("Root");
         root_group.children.push(Node::Entry(Entry::new()));
-        let mut db = create_database(
+        let db = create_database(
             OuterCipherSuite::AES256,
             Compression::GZip,
             InnerCipherSuite::Salsa20,
@@ -245,7 +243,8 @@ mod kdbx4_tests {
                     content: vec![0x04, 0x03, 0x02, 0x01],
                 },
             ],
-        );
+        )
+        .unwrap();
 
         let password = "test".to_string();
         let key_elements = key::get_key_elements(Some(&password), None).unwrap();

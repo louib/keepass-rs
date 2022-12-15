@@ -2,17 +2,13 @@ mod xml_tests {
     use keepass::{
         config::{Compression, InnerCipherSuite, KdfSettings, OuterCipherSuite},
         db::{
-            Database, DeletedObject, Entry, Group, Header, InnerHeader, Node,
-            EXPIRY_TIME_FIELD_NAME, KEEPASS_LATEST_ID, PASSWORD_FIELD_NAME, ROOT_GROUP_NAME,
-            TITLE_FIELD_NAME, USERNAME_FIELD_NAME,
+            DeletedObject, Entry, Group, Node, EXPIRY_TIME_FIELD_NAME, PASSWORD_FIELD_NAME,
+            ROOT_GROUP_NAME, TITLE_FIELD_NAME, USERNAME_FIELD_NAME,
         },
         key,
         parse::kdbx4::*,
     };
-    use std::{convert::TryInto, str};
-
-    use std::collections::HashMap;
-    use std::{fs::File, path::Path};
+    use std::str;
 
     #[test]
     pub fn test_deleted_objects() {
@@ -32,7 +28,8 @@ mod xml_tests {
             },
             Group::new(ROOT_GROUP_NAME),
             vec![],
-        );
+        )
+        .unwrap();
 
         db.deleted_objects.push(DeletedObject {
             uuid: deleted_entry_uuid.clone(),
@@ -42,7 +39,7 @@ mod xml_tests {
         let mut password_bytes: Vec<u8> = vec![];
         let mut password: String = "".to_string();
         password_bytes.resize(40, 0);
-        getrandom::getrandom(&mut password_bytes);
+        getrandom::getrandom(&mut password_bytes).unwrap();
         for random_char in password_bytes {
             password += &std::char::from_u32(random_char as u32).unwrap().to_string();
         }
@@ -113,12 +110,13 @@ mod xml_tests {
             },
             root_group,
             vec![],
-        );
+        )
+        .unwrap();
 
         let mut password_bytes: Vec<u8> = vec![];
         let mut password: String = "".to_string();
         password_bytes.resize(40, 0);
-        getrandom::getrandom(&mut password_bytes);
+        getrandom::getrandom(&mut password_bytes).unwrap();
         for random_char in password_bytes {
             password += &std::char::from_u32(random_char as u32).unwrap().to_string();
         }
@@ -185,12 +183,13 @@ mod xml_tests {
             },
             root_group,
             vec![],
-        );
+        )
+        .unwrap();
 
         let mut password_bytes: Vec<u8> = vec![];
         let mut password: String = "".to_string();
         password_bytes.resize(40, 0);
-        getrandom::getrandom(&mut password_bytes);
+        getrandom::getrandom(&mut password_bytes).unwrap();
         for random_char in password_bytes {
             password += &std::char::from_u32(random_char as u32).unwrap().to_string();
         }

@@ -4,13 +4,12 @@ use crate::result::{DatabaseIntegrityError, Error, Result};
 use secstr::SecStr;
 
 use xml::name::OwnedName;
-use xml::namespace::Namespace;
 use xml::reader::{EventReader, XmlEvent};
-use xml::writer::{EmitterConfig, EventWriter, Result as XmlResult, XmlEvent as WriterEvent};
+use xml::writer::{EmitterConfig, EventWriter, XmlEvent as WriterEvent};
 
 use super::db::{
     AutoType, AutoTypeAssociation, Database, DeletedObject, Entry, Group, Value, NOTES_FIELD_NAME,
-    TAGS_FIELD_NAME, TITLE_FIELD_NAME, USERNAME_FIELD_NAME, UUID_FIELD_NAME,
+    TAGS_FIELD_NAME, UUID_FIELD_NAME,
 };
 
 #[derive(Debug)]
@@ -60,24 +59,27 @@ fn dump_xml_timestamp(timestamp: &chrono::NaiveDateTime) -> String {
     base64::encode(timestamp_bytes)
 }
 
-pub(crate) fn dump_database(db: &Database, inner_cipher: &mut dyn Cipher) -> Result<Vec<u8>> {
+pub(crate) fn dump_database(
+    db: &Database,
+    inner_cipher: &mut dyn Cipher,
+) -> std::result::Result<Vec<u8>, xml::writer::Error> {
     let mut data: Vec<u8> = vec![];
     let mut writer = EmitterConfig::new()
         .perform_indent(false)
         .create_writer(&mut data);
 
-    writer.write::<WriterEvent>(WriterEvent::start_element("KeePassFile").into());
+    writer.write::<WriterEvent>(WriterEvent::start_element("KeePassFile").into())?;
 
-    writer.write::<WriterEvent>(WriterEvent::start_element("Meta").into());
+    writer.write::<WriterEvent>(WriterEvent::start_element("Meta").into())?;
 
-    writer.write::<WriterEvent>(WriterEvent::start_element("Generator").into());
-    writer.write::<WriterEvent>(WriterEvent::characters("keepass-rs").into());
-    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    writer.write::<WriterEvent>(WriterEvent::start_element("Generator").into())?;
+    writer.write::<WriterEvent>(WriterEvent::characters("keepass-rs").into())?;
+    writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
     if let Some(db_name) = &db.name {
-        writer.write::<WriterEvent>(WriterEvent::start_element("DatabaseName").into());
-        writer.write::<WriterEvent>(WriterEvent::characters(&db_name).into());
-        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+        writer.write::<WriterEvent>(WriterEvent::start_element("DatabaseName").into())?;
+        writer.write::<WriterEvent>(WriterEvent::characters(&db_name).into())?;
+        writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
     }
 
     // TODO DatabaseNameChanged
@@ -104,33 +106,33 @@ pub(crate) fn dump_database(db: &Database, inner_cipher: &mut dyn Cipher) -> Res
     // TODO SettingsChanged
     // TODO CustomData
 
-    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
-    writer.write::<WriterEvent>(WriterEvent::start_element("Root").into());
-    dump_xml_group(&mut writer, &db.root, inner_cipher);
-    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    writer.write::<WriterEvent>(WriterEvent::start_element("Root").into())?;
+    dump_xml_group(&mut writer, &db.root, inner_cipher)?;
+    writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
     if db.deleted_objects.len() != 0 {
-        writer.write::<WriterEvent>(WriterEvent::start_element("DeletedObjects").into());
+        writer.write::<WriterEvent>(WriterEvent::start_element("DeletedObjects").into())?;
         for deleted_object in &db.deleted_objects {
-            writer.write::<WriterEvent>(WriterEvent::start_element("DeletedObject").into());
+            writer.write::<WriterEvent>(WriterEvent::start_element("DeletedObject").into())?;
 
-            writer.write::<WriterEvent>(WriterEvent::start_element(UUID_FIELD_NAME).into());
-            writer.write::<WriterEvent>(WriterEvent::characters(&deleted_object.uuid).into());
-            writer.write::<WriterEvent>(WriterEvent::end_element().into());
+            writer.write::<WriterEvent>(WriterEvent::start_element(UUID_FIELD_NAME).into())?;
+            writer.write::<WriterEvent>(WriterEvent::characters(&deleted_object.uuid).into())?;
+            writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
-            writer.write::<WriterEvent>(WriterEvent::start_element("DeletionTime").into());
+            writer.write::<WriterEvent>(WriterEvent::start_element("DeletionTime").into())?;
             writer.write::<WriterEvent>(
                 WriterEvent::characters(&dump_xml_timestamp(&deleted_object.deletion_time)).into(),
-            );
-            writer.write::<WriterEvent>(WriterEvent::end_element().into());
+            )?;
+            writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
-            writer.write::<WriterEvent>(WriterEvent::end_element().into());
+            writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
         }
-        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+        writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
     }
 
-    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
     Ok(data)
 }
 
@@ -138,40 +140,42 @@ pub(crate) fn dump_xml_group<E: std::io::Write>(
     writer: &mut EventWriter<E>,
     group: &Group,
     inner_cipher: &mut dyn Cipher,
-) {
-    writer.write::<WriterEvent>(WriterEvent::start_element("Group").into());
+) -> std::result::Result<(), xml::writer::Error> {
+    writer.write::<WriterEvent>(WriterEvent::start_element("Group").into())?;
 
     // TODO IconId
 
-    writer.write::<WriterEvent>(WriterEvent::start_element("Name").into());
-    writer.write::<WriterEvent>(WriterEvent::characters(&group.name).into());
-    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    writer.write::<WriterEvent>(WriterEvent::start_element("Name").into())?;
+    writer.write::<WriterEvent>(WriterEvent::characters(&group.name).into())?;
+    writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
-    writer.write::<WriterEvent>(WriterEvent::start_element(UUID_FIELD_NAME).into());
-    writer.write::<WriterEvent>(WriterEvent::characters(&group.uuid).into());
-    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    writer.write::<WriterEvent>(WriterEvent::start_element(UUID_FIELD_NAME).into())?;
+    writer.write::<WriterEvent>(WriterEvent::characters(&group.uuid).into())?;
+    writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
     if group.notes.len() != 0 {
-        writer.write::<WriterEvent>(WriterEvent::start_element(NOTES_FIELD_NAME).into());
-        writer.write::<WriterEvent>(WriterEvent::characters(&group.notes).into());
-        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+        writer.write::<WriterEvent>(WriterEvent::start_element(NOTES_FIELD_NAME).into())?;
+        writer.write::<WriterEvent>(WriterEvent::characters(&group.notes).into())?;
+        writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
     }
 
     for child in &group.children {
         match child {
-            crate::Node::Entry(e) => dump_xml_entry(writer, e, inner_cipher),
-            crate::Node::Group(g) => dump_xml_group(writer, g, inner_cipher),
-        }
+            crate::Node::Entry(e) => dump_xml_entry(writer, e, inner_cipher)?,
+            crate::Node::Group(g) => dump_xml_group(writer, g, inner_cipher)?,
+        };
     }
-    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
+
+    Ok(())
 }
 
 pub(crate) fn dump_xml_entry<E: std::io::Write>(
     writer: &mut EventWriter<E>,
     entry: &Entry,
     inner_cipher: &mut dyn Cipher,
-) {
-    writer.write::<WriterEvent>(WriterEvent::start_element("Entry").into());
+) -> std::result::Result<(), xml::writer::Error> {
+    writer.write::<WriterEvent>(WriterEvent::start_element("Entry").into())?;
 
     // TODO IconId
     // TODO Times
@@ -180,32 +184,32 @@ pub(crate) fn dump_xml_entry<E: std::io::Write>(
     // TODO ForegroundColor
     // TODO BackgroundColor
     //
-    writer.write::<WriterEvent>(WriterEvent::start_element(UUID_FIELD_NAME).into());
-    writer.write::<WriterEvent>(WriterEvent::characters(&entry.uuid).into());
-    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    writer.write::<WriterEvent>(WriterEvent::start_element(UUID_FIELD_NAME).into())?;
+    writer.write::<WriterEvent>(WriterEvent::characters(&entry.uuid).into())?;
+    writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
-    writer.write::<WriterEvent>(WriterEvent::start_element("Expires").into());
+    writer.write::<WriterEvent>(WriterEvent::start_element("Expires").into())?;
     if entry.expires {
-        writer.write::<WriterEvent>(WriterEvent::characters("True").into());
+        writer.write::<WriterEvent>(WriterEvent::characters("True").into())?;
     } else {
-        writer.write::<WriterEvent>(WriterEvent::characters("False").into());
+        writer.write::<WriterEvent>(WriterEvent::characters("False").into())?;
     }
-    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
-    writer.write::<WriterEvent>(WriterEvent::start_element("Tags").into());
+    writer.write::<WriterEvent>(WriterEvent::start_element("Tags").into())?;
     writer.write::<WriterEvent>(
         WriterEvent::characters(&entry.tags.join(TAGS_SEPARATION_CHAR)).into(),
-    );
-    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    )?;
+    writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
-    writer.write::<WriterEvent>(WriterEvent::start_element("Times").into());
+    writer.write::<WriterEvent>(WriterEvent::start_element("Times").into())?;
     for time_name in entry.times.keys() {
         let time = entry.times.get(time_name).unwrap();
-        writer.write::<WriterEvent>(WriterEvent::start_element(time_name.as_ref()).into());
-        writer.write::<WriterEvent>(WriterEvent::characters(&dump_xml_timestamp(time)).into());
-        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+        writer.write::<WriterEvent>(WriterEvent::start_element(time_name.as_ref()).into())?;
+        writer.write::<WriterEvent>(WriterEvent::characters(&dump_xml_timestamp(time)).into())?;
+        writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
     }
-    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
     for field_name in entry.fields.keys() {
         let mut is_protected = true;
@@ -218,34 +222,36 @@ pub(crate) fn dump_xml_entry<E: std::io::Write>(
                 is_protected = false;
                 s.to_string()
             }
-            Value::Protected(sec_str) => entry.get(field_name).unwrap().to_string(),
+            Value::Protected(_) => entry.get(field_name).unwrap().to_string(),
         };
-        writer.write::<WriterEvent>(WriterEvent::start_element("String").into());
+        writer.write::<WriterEvent>(WriterEvent::start_element("String").into())?;
 
-        writer.write::<WriterEvent>(WriterEvent::start_element("Key").into());
-        writer.write::<WriterEvent>(WriterEvent::characters(&field_name).into());
-        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+        writer.write::<WriterEvent>(WriterEvent::start_element("Key").into())?;
+        writer.write::<WriterEvent>(WriterEvent::characters(&field_name).into())?;
+        writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
         let mut start_element_builder = WriterEvent::start_element("Value");
         if is_protected {
             start_element_builder = start_element_builder.attr("Protected", "True");
         }
-        writer.write::<WriterEvent>(start_element_builder.into());
+        writer.write::<WriterEvent>(start_element_builder.into())?;
 
         if is_protected {
             let encrypted_value = inner_cipher.encrypt(field_value.as_bytes()).unwrap();
 
             let protected_value = base64::encode(&encrypted_value);
-            writer.write::<WriterEvent>(WriterEvent::characters(&protected_value).into());
+            writer.write::<WriterEvent>(WriterEvent::characters(&protected_value).into())?;
         } else {
-            writer.write::<WriterEvent>(WriterEvent::characters(&field_value).into());
+            writer.write::<WriterEvent>(WriterEvent::characters(&field_value).into())?;
         }
-        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+        writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
 
-        writer.write::<WriterEvent>(WriterEvent::end_element().into());
+        writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
     }
 
-    writer.write::<WriterEvent>(WriterEvent::end_element().into());
+    writer.write::<WriterEvent>(WriterEvent::end_element().into())?;
+
+    Ok(())
 }
 
 pub(crate) fn parse_xml_block(

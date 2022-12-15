@@ -1,14 +1,11 @@
-use uuid::Uuid;
-
-use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 
 use crate::{
     config::{Compression, InnerCipherSuite, KdfSettings, OuterCipherSuite},
     crypt,
-    db::{Database, Entry, Group, Header, InnerHeader, Node},
-    hmac_block_stream, key,
+    db::{Database, Group, Header, InnerHeader},
+    hmac_block_stream,
     result::{DatabaseIntegrityError, Error, Result},
     variant_dictionary::VariantDictionary,
     xml_parse,
@@ -381,7 +378,10 @@ pub fn dump(db: &Database, key_elements: &[Vec<u8>]) -> Result<Vec<u8>> {
         .get_cipher(&inner_header.inner_random_stream_key)?;
 
     // after inner header is one XML document
-    let xml = xml_parse::dump_database(&db, &mut *inner_cipher)?;
+    let xml = match xml_parse::dump_database(&db, &mut *inner_cipher) {
+        Ok(xml) => xml,
+        Err(e) => return Err(Error::Unsupported(e.to_string())),
+    };
     payload.extend_from_slice(&xml);
 
     let payload_compressed = header.compression.get_compression().compress(&payload)?;
@@ -487,23 +487,23 @@ pub fn create_database(
     kdf_setting: KdfSettings,
     root: Group,
     binaries: Vec<BinaryAttachment>,
-) -> Database {
+) -> std::result::Result<Database, getrandom::Error> {
     let mut outer_iv: Vec<u8> = vec![];
     outer_iv.resize(outer_cipher_suite.get_nonce_size().into(), 0);
-    getrandom::getrandom(&mut outer_iv);
+    getrandom::getrandom(&mut outer_iv)?;
 
     let mut inner_random_stream_key: Vec<u8> = vec![];
     inner_random_stream_key.resize(inner_cipher_suite.get_nonce_size().into(), 0);
-    getrandom::getrandom(&mut inner_random_stream_key);
+    getrandom::getrandom(&mut inner_random_stream_key)?;
 
-    let mut kdf: KdfSettings;
+    let kdf: KdfSettings;
     let mut kdf_seed: Vec<u8> = vec![];
     kdf_seed.resize(kdf_setting.seed_size().into(), 0);
-    getrandom::getrandom(&mut kdf_seed);
+    getrandom::getrandom(&mut kdf_seed)?;
 
     let mut master_seed: Vec<u8> = vec![];
     master_seed.resize(crate::parse::kdbx4::HEADER_MASTER_SEED_SIZE.into(), 0);
-    getrandom::getrandom(&mut master_seed);
+    getrandom::getrandom(&mut master_seed)?;
 
     match kdf_setting {
         KdfSettings::Aes { rounds, .. } => {
@@ -525,7 +525,7 @@ pub fn create_database(
         }
     };
 
-    Database {
+    Ok(Database {
         header: Header::KDBX4(KDBX4Header {
             version: crate::db::KEEPASS_LATEST_ID,
             file_major_version: 4,
@@ -544,5 +544,5 @@ pub fn create_database(
         root,
         name: None,
         deleted_objects: vec![],
-    }
+    })
 }
