@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use crate::crypt;
 use crate::result;
 

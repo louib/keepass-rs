@@ -3,7 +3,7 @@ use std::collections::{HashMap, VecDeque};
 use uuid::Uuid;
 
 use crate::{
-    crypt, key,
+    key,
     parse::{
         kdb::KDBHeader,
         kdbx3::KDBX3Header,

@@ -2,7 +2,6 @@ use hex_literal::hex;
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::convert::TryInto;
 
 use crate::crypt::ciphers::Cipher;
 use crate::{

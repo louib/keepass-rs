@@ -1,11 +1,9 @@
 use crate::crypt::ciphers::Cipher;
 use crate::result::{DatabaseIntegrityError, Error, Result};
-use std::collections::BTreeMap;
 
 use secstr::SecStr;
 
-use xml::attribute::OwnedAttribute;
-use xml::name::{Name, OwnedName};
+use xml::name::OwnedName;
 use xml::namespace::Namespace;
 use xml::reader::{EventReader, XmlEvent};
 use xml::writer::{EmitterConfig, EventWriter, Result as XmlResult, XmlEvent as WriterEvent};
