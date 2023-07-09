@@ -50,16 +50,20 @@ impl Entry {
         let mut source_history = match &other.history {
             Some(h) => h.clone(),
             None => {
-                log.warnings
-                    .push(format!("Entry {} had no history.", self.uuid));
+                log.warnings.push(format!(
+                    "Entry {} from source database had no history.",
+                    self.uuid
+                ));
                 History::default()
             }
         };
         let mut destination_history = match &self.history {
             Some(h) => h.clone(),
             None => {
-                log.warnings
-                    .push(format!("Entry {} had no history.", self.uuid));
+                log.warnings.push(format!(
+                    "Entry {} from destination database had no history.",
+                    self.uuid
+                ));
                 History::default()
             }
         };
@@ -67,13 +71,16 @@ impl Entry {
 
         let mut response = self.clone();
 
-        if other.has_uncommited_changes() {
+        if other.has_uncommitted_changes() {
             log.warnings.push(format!(
                 "Entry {} from source database has uncommitted changes.",
                 self.uuid
             ));
             source_history.add_entry(other.clone());
         }
+
+        // TODO we should probably check for uncommitted changes in the destination
+        // database here too for consistency.
 
         history_merge_log = destination_history.merge_with(&source_history)?;
         response.history = Some(destination_history);
@@ -169,7 +176,7 @@ impl<'a> Entry {
     /// Adds the current version of the entry to the entry's history
     /// and updates the last modification timestamp.
     /// The history will only be updated if the entry has
-    /// uncommited changes.
+    /// uncommitted changes.
     ///
     /// Returns whether or not a new history entry was added.
     pub fn update_history(&mut self) -> bool {
@@ -177,7 +184,7 @@ impl<'a> Entry {
             self.history = Some(History::default());
         }
 
-        if !self.has_uncommited_changes() {
+        if !self.has_uncommitted_changes() {
             return false;
         }
 
@@ -195,7 +202,7 @@ impl<'a> Entry {
 
     /// Determines if the entry was modified since the last
     /// history update.
-    fn has_uncommited_changes(&self) -> bool {
+    fn has_uncommitted_changes(&self) -> bool {
         if let Some(history) = self.history.as_ref() {
             if history.entries.len() == 0 {
                 return true;
