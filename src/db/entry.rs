@@ -338,7 +338,7 @@ impl History {
             let existing_history_entry = new_history_entries.get(modification_time);
             if let Some(existing_history_entry) = existing_history_entry {
                 if !existing_history_entry.eq(&history_entry) {
-                    log.warnings.push("History entries have the same modification timestamp but were not the same.".to_string());
+                    log.warnings.push(format!("History entries for {} have the same modification timestamp but were not the same.", existing_history_entry.uuid));
                 }
             } else {
                 new_history_entries.insert(modification_time.clone(), history_entry.clone());
