@@ -66,7 +66,15 @@ impl Entry {
         let mut history_merge_log: MergeLog = MergeLog::default();
 
         let mut response = self.clone();
-        source_history.add_entry(other.clone());
+
+        if other.has_uncommited_changes() {
+            log.warnings.push(format!(
+                "Entry {} from source database has uncommitted changes.",
+                self.uuid
+            ));
+            source_history.add_entry(other.clone());
+        }
+
         history_merge_log = destination_history.merge_with(&source_history)?;
         response.history = Some(destination_history);
 
