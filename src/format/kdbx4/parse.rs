@@ -66,13 +66,10 @@ pub(crate) fn decrypt_kdbx4(
     // parse header
     let (outer_header, inner_header_start) = parse_outer_header(data)?;
 
-    let key_elements: KeyElements = vec![];
-    if env::var("ENABLE_CR_KEY") == Ok("true".to_string()) {
-        let key_elements =
-            database_key.get_challenge_response_key_elements(&outer_header.kdf_seed)?;
-    } else {
-        let key_elements = database_key.get_key_elements()?;
-    }
+    // TODO this should be async, and only in the async variant.
+    let database_key = database_key.challenge_response()?;
+
+    let composite_key = database_key.get_key_digest()?;
 
     // split file into segments:
     //      header_data         - The outer header data
@@ -85,9 +82,6 @@ pub(crate) fn decrypt_kdbx4(
     let hmac_block_stream = &data[(inner_header_start + 64)..];
 
     // derive master key from composite key, transform_seed, transform_rounds and master_seed
-    let key_elements: KeyElementsRef = key_elements.iter().map(|v| &v[..]).collect();
-
-    let composite_key = crypt::calculate_sha256(&key_elements)?;
     let transformed_key = outer_header
         .kdf_config
         .get_kdf_seeded(&outer_header.kdf_seed)

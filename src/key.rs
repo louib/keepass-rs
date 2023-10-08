@@ -6,7 +6,7 @@ use base64::{engine::general_purpose as base64_engine, Engine as _};
 use xml::name::OwnedName;
 use xml::reader::{EventReader, XmlEvent};
 
-use crate::{crypt::calculate_sha256, error::DatabaseKeyError};
+use crate::{crypt::{calculate_sha256, SHA256_DIGEST}, error::DatabaseKeyError};
 
 pub type KeyElements = Vec<Vec<u8>>;
 pub type KeyElementsRef<'a> = Vec<&'a [u8]>;
@@ -72,22 +72,26 @@ impl ChallengeResponseKey {
 
 pub fn get_challenge_response_from_ykchal(challenge: &[u8], slot: usize) -> Result<String, DatabaseKeyError> {
     // TODO verify that the binary is available on the system.
+    //
+    let mut hex_challenge: String = "".to_string();
+    for byte in challenge {
+        hex_challenge += &format!("{:02X}", byte);
+    }
 
     let mut command = Command::new("ykchalresp");
     command.arg(format!("-{}", slot));
-    // FIXME this is clearly not the right encoding for the challenge
-    command.arg(format!("{:?}", challenge));
+    command.arg(hex_challenge);
 
     let output = command.output()?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8(output.stderr).unwrap();
+        // let stderr = String::from_utf8(output.stderr).unwrap();
         return Err(DatabaseKeyError::ChallengeResponseKeyError);
     }
 
     match String::from_utf8(output.stdout) {
         Ok(o) => Ok(o),
-        Err(e) => Err(DatabaseKeyError::ChallengeResponseKeyError),
+        Err(_e) => Err(DatabaseKeyError::ChallengeResponseKeyError),
     }
 
 }
@@ -119,11 +123,11 @@ impl DatabaseKey {
         Default::default()
     }
 
-    pub(crate) fn get_key_elements(self) -> Result<KeyElements, DatabaseKeyError> {
+    pub(crate) fn get_key_elements(&self) -> Result<KeyElements, DatabaseKeyError> {
         // TODO raise an error if a challenge response key is defined?
         let mut out = Vec::new();
 
-        if let Some(p) = self.password {
+        if let Some(p) = &self.password {
             out.push(calculate_sha256(&[p.as_bytes()])?.to_vec());
         }
 
@@ -136,6 +140,22 @@ impl DatabaseKey {
         }
 
         Ok(out)
+    }
+
+    pub(crate) fn challenge_response(self) -> Result<DatabaseKey, DatabaseKeyError> {
+        if self.challenge_response_key.is_some() {
+
+        }
+        Ok(self)
+    }
+
+    pub(crate) fn get_key_digest(&self) -> Result<SHA256_DIGEST, DatabaseKeyError> {
+        let key_elements: KeyElements = self.get_key_elements()?.clone();
+        let key_elements: KeyElementsRef = key_elements.iter().map(|v| &v[..]).collect();
+        match calculate_sha256(&key_elements) {
+            Ok(d) => Ok(d),
+            Err(e) => Err(DatabaseKeyError::Cryptography(e)),
+        }
     }
 
     pub(crate) fn get_challenge_response_key_elements(self, challenge: &[u8]) -> Result<KeyElements, DatabaseKeyError> {
