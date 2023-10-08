@@ -1,10 +1,15 @@
 use std::io::Read;
+use std::error::Error;
+use std::process::Command;
 
 use base64::{engine::general_purpose as base64_engine, Engine as _};
 use xml::name::OwnedName;
 use xml::reader::{EventReader, XmlEvent};
 
-use crate::{crypt::calculate_sha256, error::DatabaseKeyError};
+use crate::{crypt::{calculate_sha256, SHA256_DIGEST}, error::DatabaseKeyError};
+
+pub type KeyElements = Vec<Vec<u8>>;
+pub type KeyElementsRef<'a> = Vec<&'a [u8]>;
 
 fn parse_xml_keyfile(xml: &[u8]) -> Result<Vec<u8>, DatabaseKeyError> {
     let parser = EventReader::new(xml);
@@ -54,11 +59,49 @@ fn parse_keyfile(buffer: &[u8]) -> Result<Vec<u8>, DatabaseKeyError> {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct ChallengeResponseKey {
+
+}
+impl ChallengeResponseKey {
+    pub async fn get_key_material(challenge: &str) -> Result<String, DatabaseKeyError> {
+        Ok("".to_string())
+    }
+
+}
+
+pub fn get_challenge_response_from_ykchal(challenge: &[u8], slot: usize) -> Result<String, DatabaseKeyError> {
+    // TODO verify that the binary is available on the system.
+    //
+    let mut hex_challenge: String = "".to_string();
+    for byte in challenge {
+        hex_challenge += &format!("{:02X}", byte);
+    }
+
+    let mut command = Command::new("ykchalresp");
+    command.arg(format!("-{}", slot));
+    command.arg(hex_challenge);
+
+    let output = command.output()?;
+
+    if !output.status.success() {
+        // let stderr = String::from_utf8(output.stderr).unwrap();
+        return Err(DatabaseKeyError::ChallengeResponseKeyError);
+    }
+
+    match String::from_utf8(output.stdout) {
+        Ok(o) => Ok(o),
+        Err(_e) => Err(DatabaseKeyError::ChallengeResponseKeyError),
+    }
+
+}
+
 /// A KeePass key, which might consist of a password and/or a keyfile
 #[derive(Debug, Clone, Default)]
 pub struct DatabaseKey {
     password: Option<String>,
     keyfile: Option<Vec<u8>>,
+    challenge_response_key: Option<ChallengeResponseKey>,
 }
 
 impl DatabaseKey {
@@ -80,10 +123,11 @@ impl DatabaseKey {
         Default::default()
     }
 
-    pub(crate) fn get_key_elements(self) -> Result<Vec<Vec<u8>>, DatabaseKeyError> {
+    pub(crate) fn get_key_elements(&self) -> Result<KeyElements, DatabaseKeyError> {
+        // TODO raise an error if a challenge response key is defined?
         let mut out = Vec::new();
 
-        if let Some(p) = self.password {
+        if let Some(p) = &self.password {
             out.push(calculate_sha256(&[p.as_bytes()])?.to_vec());
         }
 
@@ -97,6 +141,32 @@ impl DatabaseKey {
 
         Ok(out)
     }
+
+    pub(crate) fn challenge_response(self) -> Result<DatabaseKey, DatabaseKeyError> {
+        if self.challenge_response_key.is_some() {
+
+        }
+        Ok(self)
+    }
+
+    pub(crate) fn get_key_digest(&self) -> Result<SHA256_DIGEST, DatabaseKeyError> {
+        let key_elements: KeyElements = self.get_key_elements()?.clone();
+        let key_elements: KeyElementsRef = key_elements.iter().map(|v| &v[..]).collect();
+        match calculate_sha256(&key_elements) {
+            Ok(d) => Ok(d),
+            Err(e) => Err(DatabaseKeyError::Cryptography(e)),
+        }
+    }
+
+    pub(crate) fn get_challenge_response_key_elements(self, challenge: &[u8]) -> Result<KeyElements, DatabaseKeyError> {
+        let mut key_elements = self.get_key_elements()?;
+
+        let response = get_challenge_response_from_ykchal(challenge, 2)?;
+        key_elements.push(response.as_bytes().to_vec());
+
+        return Ok(key_elements);
+    }
+
 }
 
 #[cfg(test)]
@@ -152,7 +222,8 @@ mod key_tests {
 
         assert!(DatabaseKey {
             password: None,
-            keyfile: None
+            keyfile: None,
+            challenge_response_key: None,
         }
         .get_key_elements()
         .is_err());
@@ -160,3 +231,5 @@ mod key_tests {
         Ok(())
     }
 }
+
+

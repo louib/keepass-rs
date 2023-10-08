@@ -4,6 +4,7 @@ use crate::{
     db::{Database, Entry, Group, NodeRefMut, Value},
     error::{DatabaseIntegrityError, DatabaseKeyError, DatabaseOpenError},
     format::DatabaseVersion,
+    key::KeyElements,
 };
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -297,7 +298,7 @@ fn parse_db(header: &KDBHeader, data: &[u8]) -> Result<Group, DatabaseIntegrityE
 
 pub(crate) fn parse_kdb(
     data: &[u8],
-    key_elements: &[Vec<u8>],
+    key_elements: &KeyElements,
 ) -> Result<Database, DatabaseOpenError> {
     let header = parse_header(data)?;
     let version = DatabaseVersion::KDB(header.subversion as u16);

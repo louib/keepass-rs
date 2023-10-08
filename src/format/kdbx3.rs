@@ -4,6 +4,7 @@ use crate::{
     db::Database,
     error::{BlockStreamError, DatabaseIntegrityError, DatabaseKeyError, DatabaseOpenError},
     format::DatabaseVersion,
+    key::{KeyElements, KeyElementsRef},
 };
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -162,7 +163,7 @@ fn parse_outer_header(data: &[u8]) -> Result<KDBX3Header, DatabaseOpenError> {
 /// Open, decrypt and parse a KeePass database from a source and a password
 pub(crate) fn parse_kdbx3(
     data: &[u8],
-    key_elements: &[Vec<u8>],
+    key_elements: &KeyElements,
 ) -> Result<Database, DatabaseOpenError> {
     let (config, mut inner_decryptor, xml) = decrypt_kdbx3(data, key_elements)?;
 
@@ -184,7 +185,7 @@ pub(crate) fn parse_kdbx3(
 /// Open and decrypt a KeePass KDBX3 database from a source and a password
 pub(crate) fn decrypt_kdbx3(
     data: &[u8],
-    key_elements: &[Vec<u8>],
+    key_elements: &KeyElements,
 ) -> Result<(DatabaseConfig, Box<dyn Cipher>, Vec<u8>), DatabaseOpenError> {
     let version = DatabaseVersion::parse(data)?;
     let header = parse_outer_header(data)?;
@@ -215,7 +216,7 @@ pub(crate) fn decrypt_kdbx3(
     let payload_encrypted = &data[pos..];
 
     // derive master key from composite key, transform_seed, transform_rounds and master_seed
-    let key_elements: Vec<&[u8]> = key_elements.iter().map(|v| &v[..]).collect();
+    let key_elements: KeyElementsRef = key_elements.iter().map(|v| &v[..]).collect();
     let composite_key = calculate_sha256(&key_elements)?;
 
     // transform the key
