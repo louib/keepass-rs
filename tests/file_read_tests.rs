@@ -86,6 +86,23 @@ mod file_read_tests {
     }
 
     #[test]
+    fn open_kdbx4_with_challenge_response_key() -> Result<(), DatabaseOpenError> {
+        let path = Path::new("tests/resources/test_db_with_challenge_response_key.kdbx");
+        let db = Database::open(
+            &mut File::open(path)?,
+            DatabaseKey::new().with_password("demopass"),
+        )?;
+
+        println!("{:?} DB Opened", db);
+        assert_eq!(db.root.name, "Root");
+        assert_eq!(db.root.children.len(), 2);
+
+        println!("{:?}", db);
+
+        Ok(())
+    }
+
+    #[test]
     fn open_kdbx3_with_keyfile_xml() -> Result<(), DatabaseOpenError> {
         let path = Path::new("tests/resources/test_db_with_keyfile_xml.kdbx");
         let kf_path = Path::new("tests/resources/test_key_xml.key");

@@ -17,13 +17,14 @@ use crate::{
     },
     hmac_block_stream,
     io::WriteLengthTaggedExt,
+    key::{DatabaseKey, KeyElements, KeyElementsRef},
     variant_dictionary::VariantDictionary,
 };
 
 /// Dump a KeePass database using the key elements
 pub fn dump_kdbx4(
     db: &Database,
-    key_elements: &[Vec<u8>],
+    database_key: DatabaseKey,
     writer: &mut dyn Write,
 ) -> Result<(), DatabaseSaveError> {
     if !matches!(db.config.version, DatabaseVersion::KDB4(_)) {
@@ -62,7 +63,9 @@ pub fn dump_kdbx4(
     writer.write(&header_sha256)?;
 
     // derive master key from composite key, transform_seed, transform_rounds and master_seed
-    let key_elements: Vec<&[u8]> = key_elements.iter().map(|v| &v[..]).collect();
+    let key_elements = database_key.get_key_elements()?;
+
+    let key_elements: KeyElementsRef = key_elements.iter().map(|v| &v[..]).collect();
     let composite_key = crypt::calculate_sha256(&key_elements)?;
     let transformed_key = kdf.transform_key(&composite_key)?;
     let master_key = crypt::calculate_sha256(&[&master_seed, &transformed_key])?;
