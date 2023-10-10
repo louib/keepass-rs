@@ -4,7 +4,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use crate::{
     config::{CompressionConfig, DatabaseConfig, InnerCipherConfig, KdfConfig, OuterCipherConfig},
-    crypt::{self, ciphers::Cipher},
+    crypt::{self, ciphers::Cipher, SHA256_DIGEST},
     db::{Database, HeaderAttachment},
     error::{DatabaseIntegrityError, DatabaseKeyError, DatabaseOpenError},
     format::{
@@ -34,9 +34,9 @@ impl From<&[u8]> for HeaderAttachment {
 /// Open, decrypt and parse a KeePass database from a source and key elements
 pub(crate) fn parse_kdbx4(
     data: &[u8],
-    key_elements: &[Vec<u8>],
+    key_digest: &SHA256_DIGEST,
 ) -> Result<Database, DatabaseOpenError> {
-    let (config, header_attachments, mut inner_decryptor, xml) = decrypt_kdbx4(data, key_elements)?;
+    let (config, header_attachments, mut inner_decryptor, xml) = decrypt_kdbx4(data, key_digest)?;
 
     let database_content = crate::xml_db::parse::parse(&xml, &mut *inner_decryptor)?;
 
@@ -54,7 +54,7 @@ pub(crate) fn parse_kdbx4(
 /// Open and decrypt a KeePass KDBX4 database from a source and key elements
 pub(crate) fn decrypt_kdbx4(
     data: &[u8],
-    key_elements: &[Vec<u8>],
+    key_digest: &SHA256_DIGEST,
 ) -> Result<
     (
         DatabaseConfig,
@@ -70,7 +70,7 @@ pub(crate) fn decrypt_kdbx4(
     // split file into segments:
     //      header_data         - The outer header data
     //      header_sha256       - A Sha256 hash of header_data (for verification of header integrity)
-    //      header_hmac         - A HMAC of the header_data (for verification of the key_elements)
+    //      header_hmac         - A HMAC of the header_data (for verification of the key_digest)
     //      hmac_block_stream   - A HMAC-verified block stream of encrypted and compressed blocks
     let header_data = &data[0..inner_header_start];
     let header_sha256 = &data[inner_header_start..(inner_header_start + 32)];
@@ -78,12 +78,10 @@ pub(crate) fn decrypt_kdbx4(
     let hmac_block_stream = &data[(inner_header_start + 64)..];
 
     // derive master key from composite key, transform_seed, transform_rounds and master_seed
-    let key_elements: Vec<&[u8]> = key_elements.iter().map(|v| &v[..]).collect();
-    let composite_key = crypt::calculate_sha256(&key_elements)?;
     let transformed_key = outer_header
         .kdf_config
         .get_kdf_seeded(&outer_header.kdf_seed)
-        .transform_key(&composite_key)?;
+        .transform_key(&key_digest)?;
     let master_key =
         crypt::calculate_sha256(&[outer_header.master_seed.as_ref(), &transformed_key])?;
 

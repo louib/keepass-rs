@@ -1,6 +1,6 @@
 use crate::{
     config::{CompressionConfig, DatabaseConfig, InnerCipherConfig, KdfConfig, OuterCipherConfig},
-    crypt::{calculate_sha256, ciphers::Cipher},
+    crypt::{calculate_sha256, ciphers::Cipher, SHA256_DIGEST},
     db::Database,
     error::{BlockStreamError, DatabaseIntegrityError, DatabaseKeyError, DatabaseOpenError},
     format::DatabaseVersion,
@@ -162,9 +162,9 @@ fn parse_outer_header(data: &[u8]) -> Result<KDBX3Header, DatabaseOpenError> {
 /// Open, decrypt and parse a KeePass database from a source and a password
 pub(crate) fn parse_kdbx3(
     data: &[u8],
-    key_elements: &[Vec<u8>],
+    key_digest: &SHA256_DIGEST,
 ) -> Result<Database, DatabaseOpenError> {
-    let (config, mut inner_decryptor, xml) = decrypt_kdbx3(data, key_elements)?;
+    let (config, mut inner_decryptor, xml) = decrypt_kdbx3(data, key_digest)?;
 
     // Parse XML data blocks
     let database_content = crate::xml_db::parse::parse(&xml, &mut *inner_decryptor)
@@ -184,7 +184,7 @@ pub(crate) fn parse_kdbx3(
 /// Open and decrypt a KeePass KDBX3 database from a source and a password
 pub(crate) fn decrypt_kdbx3(
     data: &[u8],
-    key_elements: &[Vec<u8>],
+    key_digest: &SHA256_DIGEST,
 ) -> Result<(DatabaseConfig, Box<dyn Cipher>, Vec<u8>), DatabaseOpenError> {
     let version = DatabaseVersion::parse(data)?;
     let header = parse_outer_header(data)?;
@@ -214,15 +214,11 @@ pub(crate) fn decrypt_kdbx3(
     // Rest of file after header is payload
     let payload_encrypted = &data[pos..];
 
-    // derive master key from composite key, transform_seed, transform_rounds and master_seed
-    let key_elements: Vec<&[u8]> = key_elements.iter().map(|v| &v[..]).collect();
-    let composite_key = calculate_sha256(&key_elements)?;
-
-    // transform the key
+    // derive master key from key digest, transform_seed, transform_rounds and master_seed
     let transformed_key = config
         .kdf_config
         .get_kdf_seeded(&header.transform_seed)
-        .transform_key(&composite_key)?;
+        .transform_key(&key_digest)?;
 
     let master_key = calculate_sha256(&[header.master_seed.as_ref(), &transformed_key])?;
 

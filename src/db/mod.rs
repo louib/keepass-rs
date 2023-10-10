@@ -62,6 +62,7 @@ impl Database {
         key: DatabaseKey,
     ) -> Result<Database, DatabaseOpenError> {
         let key_elements = key.get_key_elements()?;
+        let key_digest = key.get_key_digest()?;
 
         let mut data = Vec::new();
         source.read_to_end(&mut data)?;
@@ -71,8 +72,8 @@ impl Database {
         match database_version {
             DatabaseVersion::KDB(_) => parse_kdb(data.as_ref(), &key_elements),
             DatabaseVersion::KDB2(_) => Err(DatabaseOpenError::UnsupportedVersion.into()),
-            DatabaseVersion::KDB3(_) => parse_kdbx3(data.as_ref(), &key_elements),
-            DatabaseVersion::KDB4(_) => parse_kdbx4(data.as_ref(), &key_elements),
+            DatabaseVersion::KDB3(_) => parse_kdbx3(data.as_ref(), &key_digest),
+            DatabaseVersion::KDB4(_) => parse_kdbx4(data.as_ref(), &key_digest),
         }
     }
 
@@ -101,7 +102,7 @@ impl Database {
         source: &mut dyn std::io::Read,
         key: DatabaseKey,
     ) -> Result<Vec<u8>, DatabaseOpenError> {
-        let key_elements = key.get_key_elements()?;
+        let key_digest = key.get_key_digest()?;
 
         let mut data = Vec::new();
         source.read_to_end(&mut data)?;
@@ -111,8 +112,8 @@ impl Database {
         let data = match database_version {
             DatabaseVersion::KDB(_) => return Err(DatabaseOpenError::UnsupportedVersion),
             DatabaseVersion::KDB2(_) => return Err(DatabaseOpenError::UnsupportedVersion),
-            DatabaseVersion::KDB3(_) => decrypt_kdbx3(data.as_ref(), &key_elements)?.2,
-            DatabaseVersion::KDB4(_) => decrypt_kdbx4(data.as_ref(), &key_elements)?.3,
+            DatabaseVersion::KDB3(_) => decrypt_kdbx3(data.as_ref(), &key_digest)?.2,
+            DatabaseVersion::KDB4(_) => decrypt_kdbx4(data.as_ref(), &key_digest)?.3,
         };
 
         Ok(data)

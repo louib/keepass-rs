@@ -4,7 +4,10 @@ use base64::{engine::general_purpose as base64_engine, Engine as _};
 use xml::name::OwnedName;
 use xml::reader::{EventReader, XmlEvent};
 
-use crate::{crypt::calculate_sha256, error::DatabaseKeyError};
+use crate::{
+    crypt::{calculate_sha256, SHA256_DIGEST},
+    error::DatabaseKeyError,
+};
 
 fn parse_xml_keyfile(xml: &[u8]) -> Result<Vec<u8>, DatabaseKeyError> {
     let parser = EventReader::new(xml);
@@ -80,10 +83,10 @@ impl DatabaseKey {
         Default::default()
     }
 
-    pub(crate) fn get_key_elements(self) -> Result<Vec<Vec<u8>>, DatabaseKeyError> {
+    pub(crate) fn get_key_elements(&self) -> Result<Vec<Vec<u8>>, DatabaseKeyError> {
         let mut out = Vec::new();
 
-        if let Some(p) = self.password {
+        if let Some(p) = &self.password {
             out.push(calculate_sha256(&[p.as_bytes()])?.to_vec());
         }
 
@@ -96,6 +99,15 @@ impl DatabaseKey {
         }
 
         Ok(out)
+    }
+
+    pub(crate) fn get_key_digest(&self) -> Result<SHA256_DIGEST, DatabaseKeyError> {
+        let key_elements = self.get_key_elements()?;
+        let key_elements: Vec<&[u8]> = key_elements.iter().map(|v| &v[..]).collect();
+        match calculate_sha256(&key_elements) {
+            Ok(d) => Ok(d),
+            Err(e) => Err(DatabaseKeyError::Cryptography(e)),
+        }
     }
 }
 

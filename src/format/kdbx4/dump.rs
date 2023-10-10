@@ -23,7 +23,7 @@ use crate::{
 /// Dump a KeePass database using the key elements
 pub fn dump_kdbx4(
     db: &Database,
-    key_elements: &[Vec<u8>],
+    key_digest: &crypt::SHA256_DIGEST,
     writer: &mut dyn Write,
 ) -> Result<(), DatabaseSaveError> {
     if !matches!(db.config.version, DatabaseVersion::KDB4(_)) {
@@ -62,9 +62,7 @@ pub fn dump_kdbx4(
     writer.write(&header_sha256)?;
 
     // derive master key from composite key, transform_seed, transform_rounds and master_seed
-    let key_elements: Vec<&[u8]> = key_elements.iter().map(|v| &v[..]).collect();
-    let composite_key = crypt::calculate_sha256(&key_elements)?;
-    let transformed_key = kdf.transform_key(&composite_key)?;
+    let transformed_key = kdf.transform_key(&key_digest)?;
     let master_key = crypt::calculate_sha256(&[&master_seed, &transformed_key])?;
 
     // verify credentials
