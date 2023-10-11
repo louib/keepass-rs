@@ -6,6 +6,9 @@ use xml::reader::{EventReader, XmlEvent};
 
 use crate::{crypt::calculate_sha256, error::DatabaseKeyError};
 
+pub type KeyElement = Vec<u8>;
+pub type KeyElements = Vec<KeyElement>;
+
 fn parse_xml_keyfile(xml: &[u8]) -> Result<Vec<u8>, DatabaseKeyError> {
     let parser = EventReader::new(xml);
 
@@ -42,7 +45,7 @@ fn parse_xml_keyfile(xml: &[u8]) -> Result<Vec<u8>, DatabaseKeyError> {
     Err(DatabaseKeyError::InvalidKeyFile)
 }
 
-fn parse_keyfile(buffer: &[u8]) -> Result<Vec<u8>, DatabaseKeyError> {
+fn parse_keyfile(buffer: &[u8]) -> Result<KeyElement, DatabaseKeyError> {
     // try to parse the buffer as XML, if successful, use that data instead of full file
     if let Ok(v) = parse_xml_keyfile(&buffer) {
         Ok(v)
@@ -54,11 +57,24 @@ fn parse_keyfile(buffer: &[u8]) -> Result<Vec<u8>, DatabaseKeyError> {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct ChallengeResponseKey {
+    id: String,
+    slot: usize,
+}
+
+impl ChallengeResponseKey {
+    pub fn get_challenge_response(seed: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        Ok(vec![])
+    }
+}
+
 /// A KeePass key, which might consist of a password and/or a keyfile
 #[derive(Debug, Clone, Default)]
 pub struct DatabaseKey {
     password: Option<String>,
     keyfile: Option<Vec<u8>>,
+    challenge_response_key: Option<ChallengeResponseKey>,
 }
 
 impl DatabaseKey {
@@ -80,10 +96,10 @@ impl DatabaseKey {
         Default::default()
     }
 
-    pub(crate) fn get_key_elements(self) -> Result<Vec<Vec<u8>>, DatabaseKeyError> {
+    pub(crate) fn get_key_elements(&self) -> Result<KeyElements, DatabaseKeyError> {
         let mut out = Vec::new();
 
-        if let Some(p) = self.password {
+        if let Some(p) = &self.password {
             out.push(calculate_sha256(&[p.as_bytes()])?.to_vec());
         }
 
@@ -96,6 +112,14 @@ impl DatabaseKey {
         }
 
         Ok(out)
+    }
+
+    pub(crate) fn get_key_elements_async(
+        &self,
+        kdf_seed: &[u8],
+    ) -> Result<KeyElements, DatabaseKeyError> {
+        let mut key_elements = self.get_key_elements()?;
+        Ok(key_elements)
     }
 }
 
@@ -152,7 +176,8 @@ mod key_tests {
 
         assert!(DatabaseKey {
             password: None,
-            keyfile: None
+            keyfile: None,
+            challenge_response_key: None,
         }
         .get_key_elements()
         .is_err());

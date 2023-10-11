@@ -17,6 +17,7 @@ use crate::{
         DatabaseVersion,
     },
     hmac_block_stream,
+    key::{DatabaseKey, KeyElements},
     variant_dictionary::VariantDictionary,
 };
 
@@ -31,14 +32,21 @@ impl From<&[u8]> for HeaderAttachment {
     }
 }
 
+pub(crate) type DecryptedDatabase = (
+    DatabaseConfig,
+    Vec<HeaderAttachment>,
+    Box<dyn Cipher>,
+    Vec<u8>,
+);
+
 /// Open, decrypt and parse a KeePass database from a source and key elements
 pub(crate) fn parse_kdbx4(
     data: &[u8],
-    key_elements: &[Vec<u8>],
+    db_key: &DatabaseKey,
 ) -> Result<Database, DatabaseOpenError> {
-    let (config, header_attachments, mut inner_decryptor, xml) = decrypt_kdbx4(data, key_elements)?;
+    let (outer_header, inner_header_start) = parse_outer_header(data)?;
 
-    let database_content = crate::xml_db::parse::parse(&xml, &mut *inner_decryptor)?;
+    let (config, header_attachments, database_content) = decrypt_kdbx4(data, db_key)?;
 
     let db = Database {
         config,
@@ -51,22 +59,12 @@ pub(crate) fn parse_kdbx4(
     Ok(db)
 }
 
-/// Open and decrypt a KeePass KDBX4 database from a source and key elements
-pub(crate) fn decrypt_kdbx4(
+fn decrypt(
     data: &[u8],
-    key_elements: &[Vec<u8>],
-) -> Result<
-    (
-        DatabaseConfig,
-        Vec<HeaderAttachment>,
-        Box<dyn Cipher>,
-        Vec<u8>,
-    ),
-    DatabaseOpenError,
-> {
-    // parse header
-    let (outer_header, inner_header_start) = parse_outer_header(data)?;
-
+    key_elements: KeyElements,
+    outer_header: KDBX4OuterHeader,
+    inner_header_start: usize,
+) -> Result<DecryptedDatabase, DatabaseOpenError> {
     // split file into segments:
     //      header_data         - The outer header data
     //      header_sha256       - A Sha256 hash of header_data (for verification of header integrity)
@@ -138,6 +136,42 @@ pub(crate) fn decrypt_kdbx4(
     };
 
     Ok((config, header_attachments, inner_decryptor, xml.to_vec()))
+}
+
+/// Open and decrypt a KeePass KDBX4 database from a source and key elements
+pub(crate) fn decrypt_kdbx4(
+    data: &[u8],
+    db_key: &DatabaseKey,
+) -> Result<
+    (
+        DatabaseConfig,
+        Vec<HeaderAttachment>,
+        crate::xml_db::parse::KeePassXml,
+    ),
+    DatabaseOpenError,
+> {
+    let (outer_header, inner_header_start) = parse_outer_header(data)?;
+
+    let key_elements = db_key.get_key_elements()?;
+
+    let (config, header_attachments, mut inner_decryptor, xml) =
+        decrypt(data, key_elements, outer_header, inner_header_start)?;
+
+    let database_content = crate::xml_db::parse::parse(&xml, &mut *inner_decryptor)?;
+    Ok((config, header_attachments, database_content))
+}
+
+/// Open and decrypt a KeePass KDBX4 database, allowing for async operations.
+/// Async operations currently include challenge-response keys
+pub(crate) fn decrypt_kdbx4_async(
+    data: &[u8],
+    db_key: &DatabaseKey,
+) -> Result<DecryptedDatabase, DatabaseOpenError> {
+    let (outer_header, inner_header_start) = parse_outer_header(data)?;
+
+    let key_elements = db_key.get_key_elements_async(&outer_header.kdf_seed)?;
+
+    decrypt(data, key_elements, outer_header, inner_header_start)
 }
 
 fn parse_outer_header(data: &[u8]) -> Result<(KDBX4OuterHeader, usize), DatabaseOpenError> {
