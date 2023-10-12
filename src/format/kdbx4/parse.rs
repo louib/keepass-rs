@@ -17,6 +17,7 @@ use crate::{
         DatabaseVersion,
     },
     hmac_block_stream,
+    key::DatabaseKey,
     variant_dictionary::VariantDictionary,
 };
 
@@ -34,9 +35,9 @@ impl From<&[u8]> for HeaderAttachment {
 /// Open, decrypt and parse a KeePass database from a source and key elements
 pub(crate) fn parse_kdbx4(
     data: &[u8],
-    key_elements: &[Vec<u8>],
+    db_key: &DatabaseKey,
 ) -> Result<Database, DatabaseOpenError> {
-    let (config, header_attachments, mut inner_decryptor, xml) = decrypt_kdbx4(data, key_elements)?;
+    let (config, header_attachments, mut inner_decryptor, xml) = decrypt_kdbx4(data, db_key)?;
 
     let database_content = crate::xml_db::parse::parse(&xml, &mut *inner_decryptor)?;
 
@@ -54,7 +55,7 @@ pub(crate) fn parse_kdbx4(
 /// Open and decrypt a KeePass KDBX4 database from a source and key elements
 pub(crate) fn decrypt_kdbx4(
     data: &[u8],
-    key_elements: &[Vec<u8>],
+    db_key: &DatabaseKey,
 ) -> Result<
     (
         DatabaseConfig,
@@ -67,6 +68,8 @@ pub(crate) fn decrypt_kdbx4(
     // parse header
     let (outer_header, inner_header_start) = parse_outer_header(data)?;
 
+    let db_key = db_key.clone().perform_challenge(&outer_header.kdf_seed)?;
+
     // split file into segments:
     //      header_data         - The outer header data
     //      header_sha256       - A Sha256 hash of header_data (for verification of header integrity)
@@ -78,6 +81,7 @@ pub(crate) fn decrypt_kdbx4(
     let hmac_block_stream = &data[(inner_header_start + 64)..];
 
     // derive master key from composite key, transform_seed, transform_rounds and master_seed
+    let key_elements = db_key.get_key_elements()?;
     let key_elements: Vec<&[u8]> = key_elements.iter().map(|v| &v[..]).collect();
     let composite_key = crypt::calculate_sha256(&key_elements)?;
     let transformed_key = outer_header
@@ -99,6 +103,11 @@ pub(crate) fn decrypt_kdbx4(
         &hmac_block_stream::HMAC_KEY_END,
     ])?;
     let header_hmac_key = hmac_block_stream::get_hmac_block_key(u64::max_value(), &hmac_key)?;
+    println!("header hmac {:?}", header_hmac);
+    println!(
+        "actual header hmac {:?}",
+        crypt::calculate_hmac(&[header_data], &header_hmac_key)?.as_slice()
+    );
     if header_hmac != crypt::calculate_hmac(&[header_data], &header_hmac_key)?.as_slice() {
         return Err(DatabaseKeyError::IncorrectKey.into());
     }
