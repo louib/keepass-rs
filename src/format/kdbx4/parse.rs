@@ -82,6 +82,9 @@ pub(crate) fn decrypt_kdbx4(
 
     // derive master key from composite key, transform_seed, transform_rounds and master_seed
     let key_elements = db_key.get_key_elements()?;
+    for key_element in &key_elements {
+        println!("key element: {}", crate::key::bytes_to_hex(&key_element))
+    }
     let key_elements: Vec<&[u8]> = key_elements.iter().map(|v| &v[..]).collect();
     let composite_key = crypt::calculate_sha256(&key_elements)?;
     let transformed_key = outer_header

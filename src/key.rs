@@ -95,12 +95,12 @@ impl DatabaseKey {
         Ok(self)
     }
 
-    pub fn with_challenge_response_key(mut self, key_slot: usize) -> Result<Self, std::io::Error> {
+    pub fn with_challenge_response_key(mut self, key_slot: usize) -> Self {
         self.challenge_response_key = Some(ChallengeResponseKey {
             id: "".to_string(),
             slot: key_slot,
         });
-        Ok(self)
+        self
     }
 
     pub fn perform_challenge(mut self, kdf_seed: &[u8]) -> Result<Self, DatabaseKeyError> {

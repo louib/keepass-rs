@@ -401,7 +401,7 @@ mod file_read_tests {
             &mut File::open(path)?,
             DatabaseKey::new()
                 .with_password("demopass")
-                .with_challenge_response_key(2)?,
+                .with_challenge_response_key(2),
         )?;
 
         println!("{:?} DB Opened", db);
