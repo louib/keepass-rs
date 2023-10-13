@@ -157,15 +157,17 @@ pub fn get_challenge_response_from_local_secret(
     let mut secret_bytes = hex_to_bytes(&secret)?;
 
     let mut challenge_bytes = challenge.clone().to_owned();
-    let padding = 64 - challenge.len();
-    while challenge_bytes.len() < 64 {
-        challenge_bytes.push(padding as u8);
-    }
+    // let padding = 64 - challenge.len();
+    // while challenge_bytes.len() < 64 {
+    //     challenge_bytes.push(padding as u8);
+    // }
     println!("Challenge: {}", bytes_to_hex(&challenge_bytes));
 
     let response = crate::crypt::calculate_hmac_sha1(&[&challenge_bytes], &secret_bytes)?.to_vec();
+    // let response = crate::crypt::calculate_sha1(&[&secret_bytes, &challenge_bytes])?.to_vec();
+    // let response = crate::crypt::calculate_hmac_sha1(&[&challenge_bytes], &secret_bytes)?.to_vec();
     let mut hex_response = bytes_to_hex(&response);
-    println!("Response:  {}", &hex_response);
+    println!("Response: {}", &hex_response);
     Ok(response)
 }
 
@@ -180,6 +182,7 @@ pub fn get_challenge_response_from_ykchal(
     println!("Challenge: {}", &hex_challenge);
 
     let mut command = Command::new("ykchalresp");
+    command.arg("-x");
     command.arg(format!("-{}", slot));
     command.arg(hex_challenge);
 
@@ -220,12 +223,13 @@ pub fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, DatabaseKeyError> {
 
     Ok(response)
 }
+
 pub fn bytes_to_hex(bytes: &[u8]) -> String {
     let mut response: String = "".to_string();
     for byte in bytes {
         response += &format!("{:02X}", byte);
     }
-    response
+    response.to_lowercase()
 }
 
 #[cfg(test)]
