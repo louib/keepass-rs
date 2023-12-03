@@ -5,10 +5,29 @@ use xml::name::OwnedName;
 use xml::reader::{EventReader, XmlEvent};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+#[cfg(feature = "challenge_response")]
+use yubico_manager::{
+    config::{Config, Mode, Slot},
+    Yubico,
+};
+
 use crate::{crypt::calculate_sha256, error::DatabaseKeyError};
 
 pub type KeyElement = Vec<u8>;
 pub type KeyElements = Vec<KeyElement>;
+
+#[cfg(feature = "challenge_response")]
+fn parse_yubikey_slot(slot_number: &str) -> Result<Slot, DatabaseKeyError> {
+    if slot_number == "1" {
+        return Ok(Slot::Slot1);
+    }
+    if slot_number == "2" {
+        return Ok(Slot::Slot2);
+    }
+    return Err(DatabaseKeyError::ChallengeResponseKeyError(
+        "Invalid slot number".to_string(),
+    ));
+}
 
 fn parse_xml_keyfile(xml: &[u8]) -> Result<KeyElement, DatabaseKeyError> {
     let parser = EventReader::new(xml);
@@ -62,7 +81,7 @@ fn parse_keyfile(buffer: &[u8]) -> Result<KeyElement, DatabaseKeyError> {
 #[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
 pub enum ChallengeResponseKey {
     LocalChallenge(String),
-    // YubikeyChallenge(String),
+    YubikeyChallenge(String),
 }
 
 #[cfg(feature = "challenge_response")]
@@ -77,6 +96,34 @@ impl ChallengeResponseKey {
                 let response =
                     crate::crypt::calculate_hmac_sha1(&[&challenge], &secret_bytes)?.to_vec();
                 Ok(response)
+            }
+            ChallengeResponseKey::YubikeyChallenge(slot_number) => {
+                let mut yubikey_client = Yubico::new();
+                let slot = parse_yubikey_slot(slot_number)?;
+
+                let yubikey_device = match yubikey_client.find_yubikey() {
+                    Ok(d) => d,
+                    Err(_e) => {
+                        return Err(DatabaseKeyError::ChallengeResponseKeyError(
+                            "Yubikey not found".to_string(),
+                        ))
+                    }
+                };
+
+                let mut config = Config::default();
+                config = config.set_vendor_id(yubikey_device.vendor_id);
+                config = config.set_product_id(yubikey_device.product_id);
+                config = config.set_variable_size(true);
+                config = config.set_mode(Mode::Sha1);
+                config = config.set_slot(slot);
+
+                match yubikey_client.challenge_response_hmac(challenge, config) {
+                    Ok(hmac_result) => Ok(hmac_result.to_vec()),
+                    Err(e) => Err(DatabaseKeyError::ChallengeResponseKeyError(format!(
+                        "Could not perform challenge response: {}",
+                        e.to_string(),
+                    ))),
+                }
             }
         }
     }
@@ -109,6 +156,17 @@ impl DatabaseKey {
         if self.password == Some("".to_string()) {
             self.password = None;
         }
+        Ok(self)
+    }
+
+    #[cfg(all(feature = "challenge_response", feature = "utilities"))]
+    pub fn with_hmac_sha1_secret_from_prompt(
+        mut self,
+        prompt_message: &str,
+    ) -> Result<Self, std::io::Error> {
+        self.challenge_response_key = Some(ChallengeResponseKey::LocalChallenge(
+            rpassword::prompt_password(prompt_message)?,
+        ));
         Ok(self)
     }
 
