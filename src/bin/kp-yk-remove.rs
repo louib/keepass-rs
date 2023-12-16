@@ -37,8 +37,10 @@ pub fn main() -> Result<()> {
 
     let key_without_yubikey = key.clone();
 
-    key =
-        key.with_challenge_response_key(ChallengeResponseKey::YubikeyChallenge(args.yubikey_slot));
+    key = key.with_challenge_response_key(ChallengeResponseKey::YubikeyChallenge(
+        args.yubikey_slot,
+        None,
+    ));
 
     let db = Database::open(&mut source, key.clone())?;
 

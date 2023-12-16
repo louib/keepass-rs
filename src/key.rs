@@ -81,7 +81,10 @@ fn parse_keyfile(buffer: &[u8]) -> Result<KeyElement, DatabaseKeyError> {
 #[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
 pub enum ChallengeResponseKey {
     LocalChallenge(String),
-    YubikeyChallenge(String),
+    /// A YubiKey used for challenge-response authentication. The key slot must be
+    /// provided, and a key ID must be provided if there are multiple keys connected
+    /// to the system
+    YubikeyChallenge(String, Option<String>),
 }
 
 #[cfg(feature = "challenge_response")]
@@ -97,11 +100,11 @@ impl ChallengeResponseKey {
                     crate::crypt::calculate_hmac_sha1(&[&challenge], &secret_bytes)?.to_vec();
                 Ok(response)
             }
-            ChallengeResponseKey::YubikeyChallenge(slot_number) => {
+            ChallengeResponseKey::YubikeyChallenge(slot_number, key_id) => {
                 let mut yubikey_client = Yubico::new();
                 let slot = parse_yubikey_slot(slot_number)?;
 
-                let yubikey_device = match yubikey_client.find_yubikey() {
+                let yubikey_devices = match yubikey_client.find_yubikeys() {
                     Ok(d) => d,
                     Err(_e) => {
                         return Err(DatabaseKeyError::ChallengeResponseKeyError(
@@ -109,6 +112,16 @@ impl ChallengeResponseKey {
                         ))
                     }
                 };
+                let mut yubikey_device = match yubikey_devices.get(0) {
+                    Some(d) => d,
+                    None => {
+                        return Err(DatabaseKeyError::ChallengeResponseKeyError(
+                            "Yubikey not found".to_string(),
+                        ));
+                    }
+                };
+
+                if let Some(key_id) = key_id {}
 
                 let mut config = Config::default();
                 config = config.set_vendor_id(yubikey_device.vendor_id);

@@ -37,8 +37,10 @@ pub fn main() -> Result<()> {
 
     let db = Database::open(&mut source, key.clone())?;
 
-    let new_key =
-        key.with_challenge_response_key(ChallengeResponseKey::YubikeyChallenge(args.yubikey_slot));
+    let new_key = key.with_challenge_response_key(ChallengeResponseKey::YubikeyChallenge(
+        args.yubikey_slot,
+        None,
+    ));
 
     let mut out_file = File::create(args.out_kdbx)?;
 

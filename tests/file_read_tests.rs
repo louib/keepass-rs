@@ -421,6 +421,7 @@ mod file_read_tests {
                 .with_password("demopass")
                 .with_challenge_response_key(keepass::ChallengeResponseKey::YubikeyChallenge(
                     "2".to_string(),
+                    None,
                 )),
         )?;
 
