@@ -411,6 +411,7 @@ impl Database {
         let mut new_from = from.clone();
         new_from.remove(0);
 
+        // FIXME we can use find_group_mut here.
         let source_group = match self.root.find_mut(&new_from).unwrap() {
             NodeRefMut::Group(g) => g,
             NodeRefMut::Entry(_) => panic!("".to_string()),
@@ -419,6 +420,7 @@ impl Database {
         // FIXME should we update the location changed timestamp??
         let relocated_node = source_group.remove_node(&node_uuid)?;
 
+        // FIXME we can use find_group_mut here.
         let destination_group = match self.root.find_mut(&to).unwrap() {
             NodeRefMut::Group(g) => g,
             NodeRefMut::Entry(_) => panic!("".to_string()),
