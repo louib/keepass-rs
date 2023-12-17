@@ -304,8 +304,45 @@ mod merge_tests {
         assert!(destination_db.deleted_objects.contains(deleted_entry_uuid));
     }
 
-    // TODO add a test to make sure that an entry is not deleted if it was modified in the
-    // destination later than it was deleted in the source.
+    #[test]
+    fn test_deleted_entry_in_source_modified_in_destination() {
+        let mut destination_db = create_test_database();
+        let mut source_db = destination_db.clone();
+
+        let deleted_entry_uuid = Uuid::new_v4();
+
+        thread::sleep(time::Duration::from_secs(1));
+        source_db
+            .deleted_objects
+            .objects
+            .push(crate::db::DeletedObject {
+                uuid: deleted_entry_uuid.clone(),
+                deletion_time: Times::now(),
+            });
+
+        thread::sleep(time::Duration::from_secs(1));
+        let mut deleted_entry = Entry::new();
+        deleted_entry.uuid = deleted_entry_uuid.clone();
+        deleted_entry.set_field_and_commit("Title", "deleted_entry");
+        destination_db.root.add_child(deleted_entry);
+
+        let entry_count_before = get_all_entries(&destination_db.root).len();
+        let group_count_before = get_all_groups(&destination_db.root).len();
+
+        let merge_result = destination_db.merge(&source_db).unwrap();
+        assert_eq!(merge_result.warnings.len(), 0);
+        assert_eq!(merge_result.events.len(), 0);
+
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        assert_eq!(entry_count_after, entry_count_before);
+        assert_eq!(group_count_after, group_count_before);
+
+        let new_entry = destination_db.root.find_node_location(deleted_entry_uuid);
+        assert!(new_entry.is_some());
+
+        assert!(!destination_db.deleted_objects.contains(deleted_entry_uuid));
+    }
 
     #[test]
     fn test_add_new_non_root_entry() {
