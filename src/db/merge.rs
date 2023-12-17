@@ -339,12 +339,8 @@ mod merge_tests {
         let group_count_before = get_all_groups(&destination_db.root).len();
         let entry_count_before = get_all_entries(&destination_db.root).len();
 
-        let mut relocated_entry = get_entry_mut(&mut source_db, &["group1", "subgroup1", "entry2"]);
-        relocated_entry.times.set_location_changed(Times::now());
-        // FIXME we should not have to update the history here. We should
-        // have a better compare function in the merge function instead.
-        relocated_entry.update_history();
-        drop(&relocated_entry);
+        thread::sleep(time::Duration::from_secs(1));
+        let new_location_changed_timestamp = Times::now();
 
         source_db
             .relocate_node(
@@ -355,7 +351,7 @@ mod merge_tests {
                     Uuid::parse_str(SUBGROUP1_ID).unwrap(),
                 ],
                 &vec![Uuid::parse_str(GROUP2_ID).unwrap()],
-                Times::now(),
+                new_location_changed_timestamp,
             )
             .unwrap();
 
@@ -375,6 +371,12 @@ mod merge_tests {
         assert_eq!(moved_entry_location.len(), 2);
         assert_eq!(&moved_entry_location[0].to_string(), ROOT_GROUP_ID);
         assert_eq!(&moved_entry_location[1].to_string(), GROUP2_ID);
+
+        let moved_entry = get_entry(&destination_db, &["group2", "entry2"]);
+        assert_eq!(
+            *moved_entry.times.get_location_changed().unwrap(),
+            new_location_changed_timestamp
+        );
     }
 
     #[test]
