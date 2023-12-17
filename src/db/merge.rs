@@ -1,3 +1,48 @@
+use uuid::Uuid;
+
+#[derive(Debug, Clone)]
+pub enum MergeEventType {
+    EntryCreated,
+    EntryLocationUpdated,
+    EntryUpdated,
+
+    GroupCreated,
+    GroupLocationUpdated,
+    GroupUpdated,
+}
+
+#[derive(Debug, Clone)]
+pub struct MergeEvent {
+    /// The uuid of the node (entry or group) affected by
+    /// the merge event.
+    pub node_uuid: Uuid,
+
+    pub event_type: MergeEventType,
+}
+
+// FIXME this should be moved to Database
+#[derive(Debug, Default, Clone)]
+pub struct MergeLog {
+    pub warnings: Vec<String>,
+    pub events: Vec<MergeEvent>,
+}
+
+impl MergeLog {
+    pub fn merge_with(&self, other: &MergeLog) -> MergeLog {
+        let mut response = MergeLog::default();
+        response.warnings.append(self.warnings.clone().as_mut());
+        response.warnings.append(other.warnings.clone().as_mut());
+        response.events.append(self.events.clone().as_mut());
+        response.events.append(other.events.clone().as_mut());
+        response
+    }
+
+    pub fn append(&mut self, other: &MergeLog) {
+        self.warnings.append(other.warnings.clone().as_mut());
+        self.events.append(other.events.clone().as_mut());
+    }
+}
+
 #[cfg(test)]
 mod merge_tests {
     use std::{fs::File, path::Path};

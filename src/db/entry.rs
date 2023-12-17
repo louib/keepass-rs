@@ -5,7 +5,7 @@ use chrono::NaiveDateTime;
 use secstr::SecStr;
 use uuid::Uuid;
 
-use crate::db::group::MergeLog;
+use crate::db::merge::MergeLog;
 use crate::db::{Color, CustomData, Times};
 
 #[cfg(feature = "totp")]

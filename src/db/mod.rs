@@ -16,7 +16,8 @@ use uuid::Uuid;
 
 pub use crate::db::{
     entry::{AutoType, AutoTypeAssociation, Entry, History, Value},
-    group::{Group, MergeEvent, MergeEventType, MergeLog},
+    group::Group,
+    merge::{MergeEvent, MergeEventType, MergeLog},
     meta::{BinaryAttachment, BinaryAttachments, CustomIcons, Icon, MemoryProtection, Meta},
     node::{Node, NodeIter, NodeRef, NodeRefMut},
 };
