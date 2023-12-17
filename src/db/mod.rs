@@ -145,7 +145,16 @@ impl Database {
     /// the same.
     #[cfg(feature = "merge")]
     pub fn merge(&mut self, other: &Database) -> Result<MergeLog, String> {
-        self.merge_group(vec![], &other.root)
+        let mut log = MergeLog::default();
+        log.append(&self.merge_group(vec![], &other.root)?);
+        log.append(&self.merge_deletions(&other)?);
+        Ok(log)
+    }
+
+    #[cfg(feature = "merge")]
+    fn merge_deletions(&mut self, other: &Database) -> Result<MergeLog, String> {
+        let mut log = MergeLog::default();
+        Ok(log)
     }
 
     #[cfg(feature = "merge")]
