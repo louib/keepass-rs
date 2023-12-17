@@ -2,9 +2,11 @@
 
 pub(crate) mod entry;
 pub(crate) mod group;
-pub(crate) mod merge;
 pub(crate) mod meta;
 pub(crate) mod node;
+
+#[cfg(feature = "merge")]
+pub(crate) mod merge;
 
 #[cfg(feature = "totp")]
 pub(crate) mod otp;
@@ -17,10 +19,12 @@ use uuid::Uuid;
 pub use crate::db::{
     entry::{AutoType, AutoTypeAssociation, Entry, History, Value},
     group::Group,
-    merge::{MergeEvent, MergeEventType, MergeLog},
     meta::{BinaryAttachment, BinaryAttachments, CustomIcons, Icon, MemoryProtection, Meta},
     node::{Node, NodeIter, NodeRef, NodeRefMut},
 };
+
+#[cfg(feature = "merge")]
+use crate::db::merge::{MergeEvent, MergeEventType, MergeLog};
 
 #[cfg(feature = "totp")]
 pub use crate::db::otp::{TOTPAlgorithm, TOTP};
@@ -139,10 +143,12 @@ impl Database {
     /// Merge this database with another version of this same database.
     /// This function will use the UUIDs to detect that entries and groups are
     /// the same.
+    #[cfg(feature = "merge")]
     pub fn merge(&mut self, other: &Database) -> Result<MergeLog, String> {
         self.merge_group(vec![], &other.root)
     }
 
+    #[cfg(feature = "merge")]
     fn merge_group(
         &mut self,
         current_group_path: NodeLocation,

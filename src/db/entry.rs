@@ -5,7 +5,9 @@ use chrono::NaiveDateTime;
 use secstr::SecStr;
 use uuid::Uuid;
 
+#[cfg(feature = "merge")]
 use crate::db::merge::MergeLog;
+
 use crate::db::{Color, CustomData, Times};
 
 #[cfg(feature = "totp")]
@@ -44,6 +46,7 @@ impl Entry {
         }
     }
 
+    #[cfg(feature = "merge")]
     pub(crate) fn merge(&self, other: &Entry) -> Result<(Entry, MergeLog), String> {
         let mut log = MergeLog::default();
 
@@ -330,6 +333,7 @@ impl History {
     }
 
     // Merge both histories together.
+    #[cfg(feature = "merge")]
     pub(crate) fn merge_with(&mut self, other: &History) -> Result<MergeLog, String> {
         let mut log = MergeLog::default();
         let mut new_history_entries: HashMap<NaiveDateTime, Entry> = HashMap::new();

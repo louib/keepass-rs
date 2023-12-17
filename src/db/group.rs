@@ -4,10 +4,12 @@ use uuid::Uuid;
 
 use crate::db::{
     entry::{Entry, Value},
-    merge::{MergeEvent, MergeEventType, MergeLog},
     node::{Node, NodeIter, NodePath, NodePathElement, NodeRef, NodeRefMut},
     CustomData, Times,
 };
+
+#[cfg(feature = "merge")]
+use crate::db::merge::{MergeEvent, MergeEventType, MergeLog};
 
 pub(crate) type NodeLocation = Vec<Uuid>;
 
@@ -329,6 +331,7 @@ impl Group {
         None
     }
 
+    #[cfg(feature = "merge")]
     pub(crate) fn merge_with(&mut self, other: &Group) -> Result<MergeLog, String> {
         let mut log = MergeLog::default();
 
