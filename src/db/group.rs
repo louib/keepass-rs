@@ -182,29 +182,8 @@ impl Group {
     }
 
     pub(crate) fn find<'a>(&'a self, path: &Vec<Uuid>) -> Option<NodeRef<'a>> {
-        if path.is_empty() {
-            Some(NodeRef::Group(self))
-        } else {
-            if path.len() == 1 {
-                let head = &path[0];
-                self.children.iter().find_map(|n| {
-                    if head == &n.get_uuid() {
-                        return Some(n.as_ref());
-                    }
-                    return None;
-                })
-            } else {
-                let head = &path[0];
-                let tail = path[1..path.len()].to_owned();
-
-                let head_group = self.children.iter().find_map(|n| match n {
-                    Node::Group(g) if head == &n.get_uuid() => Some(g),
-                    _ => None,
-                })?;
-
-                head_group.find(&tail)
-            }
-        }
+        let node_path = NodePathElement::wrap_ids(path);
+        self.get_internal(&node_path)
     }
 
     pub(crate) fn find_entry_mut<'a>(&'a mut self, path: &Vec<Uuid>) -> Option<&mut Entry> {
@@ -230,31 +209,8 @@ impl Group {
     }
 
     pub(crate) fn find_mut<'a>(&'a mut self, path: &Vec<Uuid>) -> Option<NodeRefMut<'a>> {
-        if path.is_empty() {
-            Some(NodeRefMut::Group(self))
-        } else {
-            if path.len() == 1 {
-                let head = &path[0];
-                self.children
-                    .iter_mut()
-                    .filter(|n| head == &n.get_uuid())
-                    .map(|t| t.as_mut())
-                    .next()
-            } else {
-                let head = &path[0];
-                let tail = path[1..path.len()].to_owned();
-
-                let head_group: &mut Group = self.children.iter_mut().find_map(|n| {
-                    let uuid_matches = head == &n.get_uuid();
-                    match n {
-                        Node::Group(g) if uuid_matches => Some(g),
-                        _ => None,
-                    }
-                })?;
-
-                head_group.find_mut(&tail)
-            }
-        }
+        let node_path = NodePathElement::wrap_ids(path);
+        self.get_mut_internal(&node_path)
     }
 
     /// Convenience method for getting the name of the Group
@@ -525,12 +481,12 @@ mod group_tests {
         let sample_entry_uuid = sample_entry.uuid.to_string();
         let invalid_uuid = uuid::Uuid::new_v4().to_string();
 
-        let group_path = vec![NodePathElement::UUID(&general_group_uuid)];
+        let group_path = vec![NodePathElement::UUID(general_group_uuid.clone())];
         let entry_path = vec![
-            NodePathElement::UUID(&general_group_uuid),
-            NodePathElement::UUID(&sample_entry_uuid),
+            NodePathElement::UUID(general_group_uuid),
+            NodePathElement::UUID(sample_entry_uuid),
         ];
-        let invalid_path = vec![NodePathElement::UUID(&invalid_uuid)];
+        let invalid_path = vec![NodePathElement::UUID(invalid_uuid)];
 
         assert!(db.root.get_internal(&group_path).is_some());
         assert!(db.root.get_internal(&entry_path).is_some());
@@ -555,12 +511,12 @@ mod group_tests {
         let sample_entry_uuid = sample_entry.uuid.to_string();
         let invalid_uuid = uuid::Uuid::new_v4().to_string();
 
-        let group_path = vec![NodePathElement::UUID(&general_group_uuid)];
+        let group_path = vec![NodePathElement::UUID(general_group_uuid.clone())];
         let entry_path = vec![
-            NodePathElement::UUID(&general_group_uuid),
-            NodePathElement::UUID(&sample_entry_uuid),
+            NodePathElement::UUID(general_group_uuid),
+            NodePathElement::UUID(sample_entry_uuid),
         ];
-        let invalid_path = vec![NodePathElement::UUID(&invalid_uuid)];
+        let invalid_path = vec![NodePathElement::UUID(invalid_uuid)];
 
         assert!(db.root.get_mut_internal(&group_path).is_some());
         assert!(db.root.get_mut_internal(&entry_path).is_some());

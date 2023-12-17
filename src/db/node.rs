@@ -4,15 +4,15 @@ use uuid::Uuid;
 use crate::db::{entry::Entry, group::Group};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub(crate) enum NodePathElement<'a> {
+pub(crate) enum NodePathElement {
     #[allow(dead_code)]
-    UUID(&'a str),
-    Title(&'a str),
+    UUID(String),
+    Title(String),
 }
 
-pub(crate) type NodePath<'a> = Vec<NodePathElement<'a>>;
+pub(crate) type NodePath = Vec<NodePathElement>;
 
-impl<'a> NodePathElement<'_> {
+impl NodePathElement {
     pub(crate) fn matches(&self, node: &Node) -> bool {
         let uuid = match node {
             Node::Entry(e) => e.uuid,
@@ -33,10 +33,18 @@ impl<'a> NodePathElement<'_> {
         }
     }
 
-    pub(crate) fn wrap_titles(path: &[&'a str]) -> NodePath<'a> {
+    pub(crate) fn wrap_titles(path: &[&str]) -> NodePath {
         let mut response: NodePath = vec![];
         for path_element in path {
-            response.push(NodePathElement::Title(path_element));
+            response.push(NodePathElement::Title(path_element.to_string()));
+        }
+        response
+    }
+
+    pub(crate) fn wrap_ids(uuids: &[Uuid]) -> NodePath {
+        let mut response: NodePath = vec![];
+        for uuid in uuids {
+            response.push(NodePathElement::UUID(uuid.to_string()));
         }
         response
     }
