@@ -154,6 +154,18 @@ impl Database {
     #[cfg(feature = "merge")]
     fn merge_deletions(&mut self, other: &Database) -> Result<MergeLog, String> {
         let mut log = MergeLog::default();
+
+        let mut new_deleted_objects = self.deleted_objects.clone();
+
+        for deleted_object in &other.deleted_objects.objects {
+            if new_deleted_objects.contains(deleted_object.uuid) {
+                continue;
+            }
+            let entry_location = match self.root.find_node_location(deleted_object.uuid) {
+                Some(l) => l,
+                None => continue,
+            };
+        }
         Ok(log)
     }
 
