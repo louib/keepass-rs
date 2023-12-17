@@ -136,9 +136,15 @@ mod merge_tests {
 
         // Placing the first entry in the root group
         let mut entry1 = Entry::new();
-        entry1.set_field_and_commit("Title", "entry1");
         entry1.uuid = Uuid::parse_str(ENTRY1_ID).unwrap();
+        entry1.set_field_and_commit("Title", "entry1");
         root_group.add_child(entry1);
+
+        // Placing the second entry in a subgroup
+        let mut entry2 = Entry::new();
+        entry2.uuid = Uuid::parse_str(ENTRY2_ID).unwrap();
+        entry2.set_field_and_commit("Title", "entry2");
+        subgroup1.add_child(entry2);
 
         group1.add_child(subgroup1);
         group2.add_child(subgroup2);
@@ -328,21 +334,12 @@ mod merge_tests {
     #[test]
     fn test_entry_relocation_existing_group() {
         let mut destination_db = create_test_database();
+        let mut source_db = destination_db.clone();
 
         let group_count_before = get_all_groups(&destination_db.root).len();
         let entry_count_before = get_all_entries(&destination_db.root).len();
 
-        let mut entry = Entry::new();
-        let entry_uuid = entry.uuid.clone();
-        entry.set_field_and_commit("Title", "entry1");
-        let mut destination_sub_group1 =
-            get_group_mut(&mut destination_db, &["group1", "subgroup1"]);
-        destination_sub_group1.add_child(entry.clone());
-
-        let mut source_db = destination_db.clone();
-        assert!(get_all_entries(&source_db.root).len() == 1);
-
-        let mut relocated_entry = get_entry_mut(&mut source_db, &["group1", "subgroup1", "entry1"]);
+        let mut relocated_entry = get_entry_mut(&mut source_db, &["group1", "subgroup1", "entry2"]);
         relocated_entry.times.set_location_changed(Times::now());
         // FIXME we should not have to update the history here. We should
         // have a better compare function in the merge function instead.
@@ -351,7 +348,7 @@ mod merge_tests {
 
         source_db
             .relocate_node(
-                &entry_uuid,
+                &Uuid::parse_str(ENTRY2_ID).unwrap(),
                 &vec![
                     Uuid::parse_str(ROOT_GROUP_ID).unwrap(),
                     Uuid::parse_str(GROUP1_ID).unwrap(),
@@ -368,9 +365,12 @@ mod merge_tests {
         let group_count_after = get_all_groups(&destination_db.root).len();
         let entry_count_after = get_all_entries(&destination_db.root).len();
         assert_eq!(group_count_after, group_count_before);
-        assert_eq!(entry_count_after, entry_count_before + 1);
+        assert_eq!(entry_count_after, entry_count_before);
 
-        let moved_entry_location = destination_db.root.find_node_location(entry_uuid).unwrap();
+        let moved_entry_location = destination_db
+            .root
+            .find_node_location(Uuid::parse_str(ENTRY2_ID).unwrap())
+            .unwrap();
         assert_eq!(moved_entry_location.len(), 2);
         assert_eq!(&moved_entry_location[0].to_string(), ROOT_GROUP_ID);
         assert_eq!(&moved_entry_location[1].to_string(), GROUP2_ID);
@@ -465,14 +465,10 @@ mod merge_tests {
     #[test]
     fn test_update_in_destination_no_conflict() {
         let mut destination_db = create_test_database();
-
-        let mut entry = Entry::new();
-        let entry_uuid = entry.uuid.clone();
-        entry.set_field_and_commit("Title", "entry1");
-
-        destination_db.root.add_child(entry);
-
         let mut source_db = destination_db.clone();
+
+        let entry_count_before = get_all_entries(&destination_db.root).len();
+        let group_count_before = get_all_groups(&destination_db.root).len();
 
         let mut entry = &mut destination_db.root.entries_mut()[0];
         entry.set_field_and_commit("Title", "entry1_updated");
@@ -481,6 +477,11 @@ mod merge_tests {
         assert_eq!(merge_result.warnings.len(), 0);
         assert_eq!(merge_result.events.len(), 0);
 
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        assert_eq!(entry_count_after, entry_count_before);
+        assert_eq!(group_count_after, group_count_before);
+
         let entry = destination_db.root.entries()[0];
         assert_eq!(entry.get_title(), Some("entry1_updated"));
     }
@@ -488,20 +489,23 @@ mod merge_tests {
     #[test]
     fn test_update_in_source_no_conflict() {
         let mut destination_db = create_test_database();
-
-        let mut entry = Entry::new();
-        let entry_uuid = entry.uuid.clone();
-        entry.set_field_and_commit("Title", "entry1");
-        destination_db.root.add_child(entry);
-
         let mut source_db = destination_db.clone();
+
+        let entry_count_before = get_all_entries(&destination_db.root).len();
+        let group_count_before = get_all_groups(&destination_db.root).len();
 
         let mut entry = &mut source_db.root.entries_mut()[0];
         entry.set_field_and_commit("Title", "entry1_updated");
 
         let merge_result = destination_db.merge(&source_db).unwrap();
+        println!("{:?}", merge_result);
         assert_eq!(merge_result.warnings.len(), 0);
         assert_eq!(merge_result.events.len(), 1);
+
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        assert_eq!(entry_count_after, entry_count_before);
+        assert_eq!(group_count_after, group_count_before);
 
         let entry = destination_db.root.entries()[0];
         assert_eq!(entry.get_title(), Some("entry1_updated"));
