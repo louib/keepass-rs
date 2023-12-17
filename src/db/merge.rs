@@ -621,13 +621,10 @@ mod merge_tests {
     #[test]
     fn test_group_update_and_relocation() {
         let mut destination_db = create_test_database();
-
-        let mut entry = Entry::new();
-        let entry_uuid = entry.uuid.clone();
-        entry.set_field_and_commit("Title", "entry1");
-        destination_db.root.add_child(entry);
-
         let mut source_db = destination_db.clone();
+
+        let entry_count_before = get_all_entries(&destination_db.root).len();
+        let group_count_before = get_all_groups(&destination_db.root).len();
 
         let mut group = get_group_mut(&mut source_db, &["group1", "subgroup1"]);
         group.name = "subgroup1_updated_name".to_string();
@@ -654,6 +651,11 @@ mod merge_tests {
         let merge_result = destination_db.merge(&source_db).unwrap();
         assert_eq!(merge_result.warnings.len(), 0);
         assert_eq!(merge_result.events.len(), 2);
+
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        assert_eq!(entry_count_after, entry_count_before);
+        assert_eq!(group_count_after, group_count_before);
 
         let mut modified_group =
             get_group(&mut destination_db, &["group2", "subgroup1_updated_name"]);
