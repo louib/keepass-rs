@@ -2,6 +2,7 @@
 
 pub(crate) mod entry;
 pub(crate) mod group;
+pub(crate) mod merge;
 pub(crate) mod meta;
 pub(crate) mod node;
 
