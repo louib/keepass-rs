@@ -229,6 +229,7 @@ impl Database {
                             &other_entry.uuid,
                             &destination_entry_location,
                             &current_group_path,
+                            source_location_changed_time,
                         )?;
                     }
                 }
@@ -371,6 +372,7 @@ impl Database {
                         &other_group.uuid,
                         &destination_group_location,
                         &current_group_path,
+                        other_group_location_changed,
                     )?;
 
                     log.events.push(MergeEvent {
@@ -413,6 +415,7 @@ impl Database {
         node_uuid: &Uuid,
         from: &NodeLocation,
         to: &NodeLocation,
+        new_location_changed_timestamp: NaiveDateTime,
     ) -> Result<(), String> {
         // FIXME this isn't great. The new functions return the root node but not
         // the old search functions.
@@ -425,8 +428,11 @@ impl Database {
             NodeRefMut::Entry(_) => panic!("".to_string()),
         };
 
-        // FIXME should we update the location changed timestamp??
-        let relocated_node = source_group.remove_node(&node_uuid)?;
+        let mut relocated_node = source_group.remove_node(&node_uuid)?;
+        match relocated_node {
+            Node::Group(ref mut g) => g.times.set_location_changed(new_location_changed_timestamp),
+            Node::Entry(ref mut e) => e.times.set_location_changed(new_location_changed_timestamp),
+        };
 
         // FIXME we can use find_group_mut here.
         let destination_group = match self.root.find_mut(&to).unwrap() {
