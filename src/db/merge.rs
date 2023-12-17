@@ -20,7 +20,6 @@ pub struct MergeEvent {
     pub event_type: MergeEventType,
 }
 
-// FIXME this should be moved to Database
 #[derive(Debug, Default, Clone)]
 pub struct MergeLog {
     pub warnings: Vec<String>,
