@@ -58,6 +58,13 @@ mod merge_tests {
         }
     }
 
+    fn get_entry<'a>(db: &'a Database, path: &[&str]) -> &'a Entry {
+        match db.root.get(path).unwrap() {
+            crate::db::NodeRef::Entry(e) => e,
+            crate::db::NodeRef::Group(g) => panic!("An entry was expected."),
+        }
+    }
+
     fn get_group_mut<'a>(db: &'a mut Database, path: &[&str]) -> &'a mut Group {
         match db.root.get_mut(path).unwrap() {
             crate::db::NodeRefMut::Group(g) => g,
@@ -103,11 +110,14 @@ mod merge_tests {
         response
     }
 
-    const ROOT_GROUP_ID: &str = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6a";
-    const GROUP1_ID: &str = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6b";
-    const GROUP2_ID: &str = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6c";
-    const SUBGROUP1_ID: &str = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d";
-    const SUBGROUP2_ID: &str = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6e";
+    const ROOT_GROUP_ID: &str = "00000000-0000-0000-0000-000000000001";
+    const GROUP1_ID: &str = "00000000-0000-0000-0000-000000000002";
+    const GROUP2_ID: &str = "00000000-0000-0000-0000-000000000003";
+    const SUBGROUP1_ID: &str = "00000000-0000-0000-0000-000000000004";
+    const SUBGROUP2_ID: &str = "00000000-0000-0000-0000-000000000005";
+
+    const ENTRY1_ID: &str = "00000000-0000-0000-0000-000000000006";
+    const ENTRY2_ID: &str = "00000000-0000-0000-0000-000000000007";
 
     fn create_test_database() -> Database {
         let mut db = Database::new(Default::default());
@@ -124,6 +134,12 @@ mod merge_tests {
         let mut subgroup2 = Group::new("subgroup2");
         subgroup2.uuid = Uuid::parse_str(SUBGROUP2_ID).unwrap();
 
+        // Placing the first entry in the root group
+        let mut entry1 = Entry::new();
+        entry1.set_field_and_commit("Title", "entry1");
+        entry1.uuid = Uuid::parse_str(ENTRY1_ID).unwrap();
+        root_group.add_child(entry1);
+
         group1.add_child(subgroup1);
         group2.add_child(subgroup2);
 
@@ -137,12 +153,10 @@ mod merge_tests {
     #[test]
     fn test_idempotence() {
         let mut destination_db = create_test_database();
-        let mut entry = Entry::new();
-        let entry_uuid = entry.uuid.clone();
-        entry.set_field_and_commit("Title", "entry1");
-        destination_db.root.add_child(entry);
-
         let mut source_db = destination_db.clone();
+
+        let entry_count_before = get_all_entries(&destination_db.root).len();
+        let group_count_before = get_all_groups(&destination_db.root).len();
 
         let merge_result = destination_db.merge(&source_db).unwrap();
         assert_eq!(merge_result.warnings.len(), 0);
@@ -151,6 +165,11 @@ mod merge_tests {
         // The 2 groups should be exactly the same after merging, since
         // nothing was performed during the merge.
         assert_eq!(destination_db, source_db);
+
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        assert_eq!(entry_count_after, entry_count_before);
+        assert_eq!(group_count_after, group_count_before);
 
         let mut entry = &mut destination_db.root.entries_mut()[0];
         entry.set_field_and_commit("Title", "entry1_updated");
@@ -171,59 +190,73 @@ mod merge_tests {
     #[test]
     fn test_add_new_entry() {
         let mut destination_db = create_test_database();
-
         let mut source_db = destination_db.clone();
 
-        let mut entry = Entry::new();
-        let entry_uuid = entry.uuid.clone();
-        entry.set_field_and_commit("Title", "entry1");
-        source_db.root.add_child(entry);
+        let entry_count_before = get_all_entries(&destination_db.root).len();
+        let group_count_before = get_all_groups(&destination_db.root).len();
+
+        let mut new_entry = Entry::new();
+        let new_entry_uuid = new_entry.uuid.clone();
+        new_entry.set_field_and_commit("Title", "new_entry");
+        source_db.root.add_child(new_entry);
 
         let merge_result = destination_db.merge(&source_db).unwrap();
         assert_eq!(merge_result.warnings.len(), 0);
         assert_eq!(merge_result.events.len(), 1);
-        assert_eq!(destination_db.root.children.len(), 3);
+
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        assert_eq!(entry_count_after, entry_count_before + 1);
+        assert_eq!(group_count_after, group_count_before);
 
         let root_entries = destination_db.root.entries();
-        assert_eq!(root_entries.len(), 1);
-        let new_entry = root_entries.get(0);
-        assert!(new_entry.is_some());
-        assert_eq!(
-            new_entry.unwrap().get_title().unwrap(),
-            "entry1".to_string()
-        );
+        assert_eq!(root_entries.len(), 2);
+
+        let new_entry = get_entry(&destination_db, &["new_entry"]);
+        assert_eq!(new_entry.get_title().unwrap(), "new_entry".to_string());
 
         // Merging the same group again should not create a duplicate entry.
         let merge_result = destination_db.merge(&source_db).unwrap();
         assert_eq!(merge_result.warnings.len(), 0);
         assert_eq!(merge_result.events.len(), 0);
-        assert_eq!(destination_db.root.children.len(), 3);
+
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        assert_eq!(entry_count_after, entry_count_before + 1);
+        assert_eq!(group_count_after, group_count_before);
     }
 
     #[test]
     fn test_deleted_entry_in_destination() {
         let mut destination_db = create_test_database();
-
         let mut source_db = destination_db.clone();
 
-        let mut entry = Entry::new();
-        let entry_uuid = entry.uuid.clone();
-        entry.set_field_and_commit("Title", "entry1");
-        source_db.root.add_child(entry);
+        let entry_count_before = get_all_entries(&destination_db.root).len();
+        let group_count_before = get_all_groups(&destination_db.root).len();
+
+        let mut deleted_entry = Entry::new();
+        let deleted_entry_uuid = deleted_entry.uuid.clone();
+        deleted_entry.set_field_and_commit("Title", "deleted_entry");
+        source_db.root.add_child(deleted_entry);
 
         destination_db
             .deleted_objects
             .objects
             .push(crate::db::DeletedObject {
-                uuid: entry_uuid.clone(),
+                uuid: deleted_entry_uuid.clone(),
                 deletion_time: Times::now(),
             });
 
         let merge_result = destination_db.merge(&source_db).unwrap();
         assert_eq!(merge_result.warnings.len(), 0);
         assert_eq!(merge_result.events.len(), 0);
-        assert_eq!(destination_db.root.children.len(), 2);
-        let new_entry = destination_db.root.find_node_location(entry_uuid);
+
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        assert_eq!(entry_count_after, entry_count_before);
+        assert_eq!(group_count_after, group_count_before);
+
+        let new_entry = destination_db.root.find_node_location(deleted_entry_uuid);
         assert!(new_entry.is_none());
     }
 
@@ -237,10 +270,10 @@ mod merge_tests {
 
         let mut source_sub_group = &mut source_db.root.groups_mut()[0];
 
-        let mut entry = Entry::new();
-        let entry_uuid = entry.uuid.clone();
-        entry.set_field_and_commit("Title", "entry1");
-        source_sub_group.add_child(entry);
+        let mut new_entry = Entry::new();
+        let new_entry_uuid = new_entry.uuid.clone();
+        new_entry.set_field_and_commit("Title", "new_entry");
+        source_sub_group.add_child(new_entry);
 
         let merge_result = destination_db.merge(&source_db).unwrap();
         assert_eq!(merge_result.warnings.len(), 0);
@@ -251,7 +284,10 @@ mod merge_tests {
         assert_eq!(entry_count_after, entry_count_before + 1);
         assert_eq!(group_count_after, group_count_before);
 
-        let created_entry_location = destination_db.root.find_node_location(entry_uuid).unwrap();
+        let created_entry_location = destination_db
+            .root
+            .find_node_location(new_entry_uuid)
+            .unwrap();
         assert_eq!(created_entry_location.len(), 2);
     }
 
@@ -266,10 +302,10 @@ mod merge_tests {
         let mut source_group = Group::new("group2");
         let mut source_sub_group = Group::new("subgroup2");
 
-        let mut entry = Entry::new();
-        let entry_uuid = entry.uuid.clone();
-        entry.set_field_and_commit("Title", "entry1");
-        source_sub_group.add_child(entry);
+        let mut new_entry = Entry::new();
+        let new_entry_uuid = new_entry.uuid.clone();
+        new_entry.set_field_and_commit("Title", "new_entry");
+        source_sub_group.add_child(new_entry);
         source_group.add_child(source_sub_group);
         source_db.root.add_child(source_group);
 
@@ -282,7 +318,10 @@ mod merge_tests {
         assert_eq!(entry_count_after, entry_count_before + 1);
         assert_eq!(group_count_after, group_count_before + 2);
 
-        let created_entry_location = destination_db.root.find_node_location(entry_uuid).unwrap();
+        let created_entry_location = destination_db
+            .root
+            .find_node_location(new_entry_uuid)
+            .unwrap();
         assert_eq!(created_entry_location.len(), 3);
     }
 
