@@ -3,6 +3,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone)]
 pub enum MergeEventType {
     EntryCreated,
+    EntryDeleted,
     EntryLocationUpdated,
     EntryUpdated,
 
@@ -279,6 +280,7 @@ mod merge_tests {
         let entry_count_before = get_all_entries(&destination_db.root).len();
         let group_count_before = get_all_groups(&destination_db.root).len();
 
+        thread::sleep(time::Duration::from_secs(1));
         source_db
             .deleted_objects
             .objects
@@ -289,7 +291,7 @@ mod merge_tests {
 
         let merge_result = destination_db.merge(&source_db).unwrap();
         assert_eq!(merge_result.warnings.len(), 0);
-        assert_eq!(merge_result.events.len(), 0);
+        assert_eq!(merge_result.events.len(), 1);
 
         let entry_count_after = get_all_entries(&destination_db.root).len();
         let group_count_after = get_all_groups(&destination_db.root).len();
@@ -298,7 +300,12 @@ mod merge_tests {
 
         let new_entry = destination_db.root.find_node_location(deleted_entry_uuid);
         assert!(new_entry.is_none());
+
+        assert!(destination_db.deleted_objects.contains(deleted_entry_uuid));
     }
+
+    // TODO add a test to make sure that an entry is not deleted if it was modified in the
+    // destination later than it was deleted in the source.
 
     #[test]
     fn test_add_new_non_root_entry() {

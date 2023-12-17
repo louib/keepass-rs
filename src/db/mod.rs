@@ -161,11 +161,51 @@ impl Database {
             if new_deleted_objects.contains(deleted_object.uuid) {
                 continue;
             }
-            let entry_location = match self.root.find_node_location(deleted_object.uuid) {
+            let mut entry_location = match self.root.find_node_location(deleted_object.uuid) {
                 Some(l) => l,
                 None => continue,
             };
+
+            // FIXME we shouldn't have to remove the root group.
+            entry_location.remove(0);
+            let mut parent_group = match self.root.find_group_mut(&entry_location) {
+                Some(g) => g,
+                None => return Err(format!("Expected a group at {:?}", &entry_location)),
+            };
+
+            let entry = match parent_group.find_entry(&vec![deleted_object.uuid]) {
+                Some(e) => e,
+                None => {
+                    return Err(format!(
+                        "Expected to find entry {} at {:?}",
+                        &deleted_object.uuid, &entry_location
+                    ))
+                }
+            };
+
+            let entry_last_modification = match entry.times.get_last_modification() {
+                Some(t) => *t,
+                None => {
+                    log.warnings.push(format!(
+                        "Entry {} did not have a last modification timestamp",
+                        entry.uuid
+                    ));
+                    Times::now()
+                }
+            };
+
+            if entry_last_modification < deleted_object.deletion_time {
+                parent_group.remove_node(&deleted_object.uuid)?;
+                log.events.push(MergeEvent {
+                    event_type: MergeEventType::EntryDeleted,
+                    node_uuid: deleted_object.uuid,
+                });
+
+                new_deleted_objects.objects.push(deleted_object.clone());
+            }
         }
+
+        self.deleted_objects = new_deleted_objects;
         Ok(log)
     }
 
