@@ -729,7 +729,6 @@ mod merge_tests {
             .relocate_node(
                 &Uuid::parse_str(ENTRY2_ID).unwrap(),
                 &vec![
-                    Uuid::parse_str(ROOT_GROUP_ID).unwrap(),
                     Uuid::parse_str(GROUP1_ID).unwrap(),
                     Uuid::parse_str(SUBGROUP1_ID).unwrap(),
                 ],
@@ -887,7 +886,6 @@ mod merge_tests {
         entry.set_field_and_commit("Title", "entry1_updated");
 
         let merge_result = destination_db.merge(&source_db).unwrap();
-        println!("{:?}", merge_result);
         assert_eq!(merge_result.warnings.len(), 0);
         assert_eq!(merge_result.events.len(), 1);
 
@@ -1034,10 +1032,7 @@ mod merge_tests {
         source_db
             .relocate_node(
                 &Uuid::parse_str(SUBGROUP1_ID).unwrap(),
-                &vec![
-                    Uuid::parse_str(ROOT_GROUP_ID).unwrap(),
-                    Uuid::parse_str(GROUP1_ID).unwrap(),
-                ],
+                &vec![Uuid::parse_str(GROUP1_ID).unwrap()],
                 &vec![Uuid::parse_str(GROUP2_ID).unwrap()],
                 new_modification_timestamp,
             )

@@ -177,13 +177,11 @@ impl Database {
             if new_deleted_objects.contains(deleted_object.uuid) {
                 continue;
             }
-            let mut entry_location = match self.root.find_node_location(deleted_object.uuid) {
+            let mut entry_location = match self.find_node_location(deleted_object.uuid) {
                 Some(l) => l,
                 None => continue,
             };
 
-            // FIXME we shouldn't have to remove the root group.
-            entry_location.remove(0);
             let mut parent_group = match self.root.find_group_mut(&entry_location) {
                 Some(g) => g,
                 None => return Err(format!("Expected a group at {:?}", &entry_location)),
@@ -230,13 +228,11 @@ impl Database {
             if new_deleted_objects.contains(deleted_object.uuid) {
                 continue;
             }
-            let mut group_location = match self.root.find_node_location(deleted_object.uuid) {
+            let mut group_location = match self.find_node_location(deleted_object.uuid) {
                 Some(l) => l,
                 None => continue,
             };
 
-            // FIXME we shouldn't have to remove the root group.
-            group_location.remove(0);
             let mut parent_group = match self.root.find_group_mut(&group_location) {
                 Some(g) => g,
                 None => return Err(format!("Expected to find group at {:?}", &group_location)),
@@ -301,6 +297,27 @@ impl Database {
         Ok(log)
     }
 
+    pub(crate) fn find_node_location(&self, id: Uuid) -> Option<NodeLocation> {
+        for node in &self.root.children {
+            match node {
+                Node::Entry(e) => {
+                    if e.uuid == id {
+                        return Some(vec![]);
+                    }
+                }
+                Node::Group(g) => {
+                    if g.uuid == id {
+                        return Some(vec![]);
+                    }
+                    if let Some(mut location) = g.find_node_location(id) {
+                        return Some(location);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     #[cfg(feature = "merge")]
     fn merge_group(
         &mut self,
@@ -316,15 +333,11 @@ impl Database {
 
         for other_entry in &current_group.entries() {
             // find the existing location
-            let destination_entry_location = self.root.find_node_location(other_entry.uuid);
+            let destination_entry_location = self.find_node_location(other_entry.uuid);
 
             // The group already exists in the destination database.
             if let Some(destination_entry_location) = destination_entry_location {
-                let parent_group_uuid = destination_entry_location.last().unwrap();
-
                 let mut existing_entry_location = destination_entry_location.clone();
-                // FIXME we shouldn't have to remove the root group.
-                existing_entry_location.remove(0);
                 existing_entry_location.push(other_entry.uuid);
 
                 // The entry already exists but is not at the right location. We might have to
@@ -337,7 +350,7 @@ impl Database {
 
                 // The entry already exists and is at the right location, so we can proceed and merge
                 // the two groups.
-                if parent_group_uuid != &current_group.uuid {
+                if current_group_path != destination_entry_location {
                     let source_location_changed_time =
                         match other_entry.times.get_location_changed() {
                             Some(t) => *t,
@@ -464,22 +477,18 @@ impl Database {
             let other_group_uuid = other_group.uuid;
             new_group_location.push(other_group_uuid);
 
-            let destination_group_location = self.root.find_node_location(other_group.uuid);
+            let destination_group_location = self.find_node_location(other_group.uuid);
             // The group already exists in the destination database.
             if let Some(destination_group_location) = destination_group_location {
-                let parent_group_uuid = destination_group_location.last().unwrap();
-
                 // The group already exists and is at the right location, so we can proceed and merge
                 // the two groups.
-                if parent_group_uuid == &other_group_uuid {
+                if current_group_path == destination_group_location {
                     let new_merge_log = self.merge_group(new_group_location, other_group)?;
                     log.append(&new_merge_log);
                     continue;
                 }
 
                 let mut existing_group_location = destination_group_location.clone();
-                // FIXME we shouldn't have to remove the root group.
-                existing_group_location.remove(0);
                 existing_group_location.push(other_group_uuid);
 
                 // The group already exists but is not at the right location. We might have to
@@ -557,13 +566,8 @@ impl Database {
         to: &NodeLocation,
         new_location_changed_timestamp: NaiveDateTime,
     ) -> Result<(), String> {
-        // FIXME this isn't great. The new functions return the root node but not
-        // the old search functions.
-        let mut new_from = from.clone();
-        new_from.remove(0);
-
         // FIXME we can use find_group_mut here.
-        let source_group = match self.root.find_mut(&new_from).unwrap() {
+        let source_group = match self.root.find_mut(&from).unwrap() {
             NodeRefMut::Group(g) => g,
             NodeRefMut::Entry(_) => panic!("".to_string()),
         };
