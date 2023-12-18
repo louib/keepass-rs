@@ -416,6 +416,81 @@ mod merge_tests {
     }
 
     #[test]
+    fn test_group_subtree_deletion() {
+        let mut destination_db = create_test_database();
+        let mut source_db = destination_db.clone();
+
+        let deleted_entry_uuid = Uuid::new_v4();
+        let deleted_group_uuid = Uuid::new_v4();
+        let deleted_subgroup_uuid = Uuid::new_v4();
+
+        thread::sleep(time::Duration::from_secs(1));
+        let mut deleted_entry = Entry::new();
+        deleted_entry.uuid = deleted_entry_uuid.clone();
+        deleted_entry.set_field_and_commit("Title", "deleted_entry");
+
+        let mut deleted_subgroup = Group::new("deleted_subgroup");
+        deleted_subgroup.uuid = deleted_subgroup_uuid.clone();
+        deleted_subgroup.add_child(deleted_entry);
+
+        let mut deleted_group = Group::new("deleted_group");
+        deleted_group.uuid = deleted_group_uuid.clone();
+        deleted_group.add_child(deleted_subgroup);
+
+        destination_db.root.add_child(deleted_group);
+
+        thread::sleep(time::Duration::from_secs(1));
+        source_db
+            .deleted_objects
+            .objects
+            .push(crate::db::DeletedObject {
+                uuid: deleted_entry_uuid.clone(),
+                deletion_time: Times::now(),
+            });
+        source_db
+            .deleted_objects
+            .objects
+            .push(crate::db::DeletedObject {
+                uuid: deleted_subgroup_uuid.clone(),
+                deletion_time: Times::now(),
+            });
+        source_db
+            .deleted_objects
+            .objects
+            .push(crate::db::DeletedObject {
+                uuid: deleted_group_uuid.clone(),
+                deletion_time: Times::now(),
+            });
+
+        let entry_count_before = get_all_entries(&destination_db.root).len();
+        let group_count_before = get_all_groups(&destination_db.root).len();
+
+        let merge_result = destination_db.merge(&source_db).unwrap();
+        assert_eq!(merge_result.warnings.len(), 0);
+        assert_eq!(merge_result.events.len(), 3);
+
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        assert_eq!(entry_count_after, entry_count_before - 1);
+        assert_eq!(group_count_after, group_count_before - 2);
+
+        let deleted_entry = destination_db.root.find_node_location(deleted_entry_uuid);
+        assert!(deleted_entry.is_none());
+        let deleted_subgroup = destination_db
+            .root
+            .find_node_location(deleted_subgroup_uuid);
+        assert!(deleted_subgroup.is_none());
+        let deleted_group = destination_db.root.find_node_location(deleted_group_uuid);
+        assert!(deleted_group.is_none());
+
+        assert!(destination_db.deleted_objects.contains(deleted_entry_uuid));
+        assert!(destination_db
+            .deleted_objects
+            .contains(deleted_subgroup_uuid));
+        assert!(destination_db.deleted_objects.contains(deleted_group_uuid));
+    }
+
+    #[test]
     fn test_deleted_group_in_source_modified_in_destination() {
         let mut destination_db = create_test_database();
         let mut source_db = destination_db.clone();
