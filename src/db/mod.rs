@@ -309,23 +309,10 @@ impl Database {
     ) -> Result<MergeLog, String> {
         let mut log = MergeLog::default();
 
-        let destination_group = match self.root.find_group_mut(&current_group_path) {
-            Some(g) => g,
-            None => {
-                return Err(format!(
-                    "Could not find group at location {:?}",
-                    current_group_path
-                ))
-            }
-        };
-
-        let group_update_merge_events = destination_group.merge_with(&current_group)?;
-        log.append(&group_update_merge_events);
-
-        // We don't need the original group here, only a copy so that we can do some
-        // queries on it.
-        let destination_group = destination_group.clone();
-        let current_group_uuid = current_group.uuid;
+        if let Some(destination_group) = self.root.find_group_mut(&current_group_path) {
+            let group_update_merge_events = destination_group.merge_with(&current_group)?;
+            log.append(&group_update_merge_events);
+        }
 
         for other_entry in &current_group.entries() {
             // find the existing location
@@ -350,7 +337,7 @@ impl Database {
 
                 // The entry already exists and is at the right location, so we can proceed and merge
                 // the two groups.
-                if parent_group_uuid != &current_group_uuid {
+                if parent_group_uuid != &current_group.uuid {
                     let source_location_changed_time =
                         match other_entry.times.get_location_changed() {
                             Some(t) => *t,
