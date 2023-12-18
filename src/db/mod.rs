@@ -348,9 +348,9 @@ impl Database {
                     .unwrap()
                     .clone();
 
-                // The entry already exists and is at the right location, so we can proceed and merge
-                // the two groups.
-                if current_group_path != destination_entry_location {
+                // The entry already exists but is not at the right location. We might have to
+                // relocate it.
+                if current_group_path.last() != destination_entry_location.last() {
                     let source_location_changed_time =
                         match other_entry.times.get_location_changed() {
                             Some(t) => *t,
@@ -390,6 +390,8 @@ impl Database {
                 if existing_entry == **other_entry {
                     continue;
                 }
+                // The entry already exists and is at the right location, so we can proceed and merge
+                // the two groups.
 
                 let source_last_modification = match other_entry.times.get_last_modification() {
                     Some(t) => *t,
@@ -439,8 +441,6 @@ impl Database {
                     continue;
                 }
 
-                // The entry already exists but is not at the right location. We might have to
-                // relocate it.
                 let mut existing_entry =
                     self.root.find_entry_mut(&existing_entry_location).unwrap();
                 *existing_entry = merged_entry.clone();
