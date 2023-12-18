@@ -270,6 +270,10 @@ mod merge_tests {
 
     #[test]
     #[ignore]
+    // TODO all that is left is to make this test pass, and to add another test to make sure that
+    // we still would sync entries under a deleted group. We would not update the location or
+    // create new entries, but we would update existing entries even if they live under a
+    // deleted group.
     fn test_deleted_group_in_destination() {
         let mut destination_db = create_test_database();
         let mut source_db = destination_db.clone();
