@@ -11,7 +11,10 @@ pub(crate) mod merge;
 #[cfg(feature = "totp")]
 pub(crate) mod otp;
 
-use std::{collections::HashMap, str::FromStr};
+use std::{
+    collections::{HashMap, VecDeque},
+    str::FromStr,
+};
 
 use chrono::NaiveDateTime;
 use uuid::Uuid;
@@ -153,10 +156,23 @@ impl Database {
 
     #[cfg(feature = "merge")]
     fn merge_deletions(&mut self, other: &Database) -> Result<MergeLog, String> {
+        // Utility function to search for a UUID in the VecDeque of deleted objects.
+        let is_in_deleted_queue =
+            |uuid: Uuid, deleted_groups_queue: &VecDeque<DeletedObject>| -> bool {
+                for deleted_object in deleted_groups_queue {
+                    // This group still has a child group, but it is not going to be deleted.
+                    if deleted_object.uuid == uuid {
+                        return true;
+                    }
+                }
+                false
+            };
+
         let mut log = MergeLog::default();
 
         let mut new_deleted_objects = self.deleted_objects.clone();
 
+        // We start by deleting the entries, since we will only remove groups if they are empty.
         for deleted_object in &other.deleted_objects.objects {
             if new_deleted_objects.contains(deleted_object.uuid) {
                 continue;
@@ -195,6 +211,86 @@ impl Database {
             };
 
             if entry_last_modification < deleted_object.deletion_time {
+                parent_group.remove_node(&deleted_object.uuid)?;
+                log.events.push(MergeEvent {
+                    event_type: MergeEventType::EntryDeleted,
+                    node_uuid: deleted_object.uuid,
+                });
+
+                new_deleted_objects.objects.push(deleted_object.clone());
+            }
+        }
+
+        let mut deleted_groups_queue: VecDeque<DeletedObject> = vec![].into();
+        for deleted_object in &other.deleted_objects.objects {
+            if new_deleted_objects.contains(deleted_object.uuid) {
+                continue;
+            }
+            deleted_groups_queue.push_back(deleted_object.clone());
+        }
+
+        while !deleted_groups_queue.is_empty() {
+            let deleted_object = deleted_groups_queue.pop_front().unwrap();
+            if new_deleted_objects.contains(deleted_object.uuid) {
+                continue;
+            }
+            let mut group_location = match self.root.find_node_location(deleted_object.uuid) {
+                Some(l) => l,
+                None => continue,
+            };
+
+            // FIXME we shouldn't have to remove the root group.
+            group_location.remove(0);
+            let mut parent_group = match self.root.find_group_mut(&group_location) {
+                Some(g) => g,
+                None => return Err(format!("Expected to find group at {:?}", &group_location)),
+            };
+
+            let group = match parent_group.find_group(&vec![deleted_object.uuid]) {
+                Some(e) => e,
+                None => {
+                    // The node might be an entry, since we didn't necessarily removed all the
+                    // entries that were in the deleted objects of the source database.
+                    continue;
+                }
+            };
+
+            // Not deleting a group if it still has entries.
+            if !group.entries().is_empty() {
+                continue;
+            }
+
+            // This group still has a child group that might get deleted in the future, so we delay
+            // decision to delete it or not.
+            if group
+                .groups()
+                .iter()
+                .filter(|g| !is_in_deleted_queue(g.uuid, &deleted_groups_queue))
+                .collect::<Vec<_>>()
+                .len()
+                != 0
+            {
+                deleted_groups_queue.push_back(deleted_object.clone());
+                continue;
+            }
+
+            // This group still a groups that won't be deleted, so we don't delete it.
+            if group.groups().len() != 0 {
+                continue;
+            }
+
+            let group_last_modification = match group.times.get_last_modification() {
+                Some(t) => *t,
+                None => {
+                    log.warnings.push(format!(
+                        "Group {} did not have a last modification timestamp",
+                        group.uuid
+                    ));
+                    Times::now()
+                }
+            };
+
+            if group_last_modification < deleted_object.deletion_time {
                 parent_group.remove_node(&deleted_object.uuid)?;
                 log.events.push(MergeEvent {
                     event_type: MergeEventType::EntryDeleted,
