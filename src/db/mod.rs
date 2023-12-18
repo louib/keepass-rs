@@ -191,12 +191,8 @@ impl Database {
 
             let entry = match parent_group.find_entry(&vec![deleted_object.uuid]) {
                 Some(e) => e,
-                None => {
-                    return Err(format!(
-                        "Expected to find entry {} at {:?}",
-                        &deleted_object.uuid, &entry_location
-                    ))
-                }
+                // This uuid might refer to a group, which will be handled later.
+                None => continue,
             };
 
             let entry_last_modification = match entry.times.get_last_modification() {

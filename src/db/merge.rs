@@ -269,6 +269,40 @@ mod merge_tests {
     }
 
     #[test]
+    #[ignore]
+    fn test_deleted_group_in_destination() {
+        let mut destination_db = create_test_database();
+        let mut source_db = destination_db.clone();
+
+        let entry_count_before = get_all_entries(&destination_db.root).len();
+        let group_count_before = get_all_groups(&destination_db.root).len();
+
+        let mut deleted_group = Group::new("deleted_group");
+        let deleted_group_uuid = deleted_group.uuid.clone();
+        source_db.root.add_child(deleted_group);
+
+        destination_db
+            .deleted_objects
+            .objects
+            .push(crate::db::DeletedObject {
+                uuid: deleted_group_uuid.clone(),
+                deletion_time: Times::now(),
+            });
+
+        let merge_result = destination_db.merge(&source_db).unwrap();
+        assert_eq!(merge_result.warnings.len(), 0);
+        assert_eq!(merge_result.events.len(), 0);
+
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        assert_eq!(entry_count_after, entry_count_before);
+        assert_eq!(group_count_after, group_count_before);
+
+        let deleted_group = destination_db.root.find_node_location(deleted_group_uuid);
+        assert!(deleted_group.is_none());
+    }
+
+    #[test]
     fn test_deleted_entry_in_source() {
         let mut destination_db = create_test_database();
         let mut source_db = destination_db.clone();
@@ -303,6 +337,42 @@ mod merge_tests {
         assert!(new_entry.is_none());
 
         assert!(destination_db.deleted_objects.contains(deleted_entry_uuid));
+    }
+
+    #[test]
+    fn test_deleted_group_in_source() {
+        let mut destination_db = create_test_database();
+        let mut source_db = destination_db.clone();
+
+        let mut deleted_group = Group::new("deleted_group");
+        let deleted_group_uuid = deleted_group.uuid.clone();
+        destination_db.root.add_child(deleted_group);
+
+        let entry_count_before = get_all_entries(&destination_db.root).len();
+        let group_count_before = get_all_groups(&destination_db.root).len();
+
+        thread::sleep(time::Duration::from_secs(1));
+        source_db
+            .deleted_objects
+            .objects
+            .push(crate::db::DeletedObject {
+                uuid: deleted_group_uuid.clone(),
+                deletion_time: Times::now(),
+            });
+
+        let merge_result = destination_db.merge(&source_db).unwrap();
+        assert_eq!(merge_result.warnings.len(), 0);
+        assert_eq!(merge_result.events.len(), 1);
+
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        assert_eq!(entry_count_after, entry_count_before);
+        assert_eq!(group_count_after, group_count_before - 1);
+
+        let deleted_group = destination_db.root.find_node_location(deleted_group_uuid);
+        assert!(deleted_group.is_none());
+
+        assert!(destination_db.deleted_objects.contains(deleted_group_uuid));
     }
 
     #[test]
