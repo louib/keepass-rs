@@ -566,10 +566,9 @@ impl Database {
         to: &NodeLocation,
         new_location_changed_timestamp: NaiveDateTime,
     ) -> Result<(), String> {
-        // FIXME we can use find_group_mut here.
-        let source_group = match self.root.find_mut(&from).unwrap() {
-            NodeRefMut::Group(g) => g,
-            NodeRefMut::Entry(_) => panic!("".to_string()),
+        let source_group = match self.root.find_group_mut(&from) {
+            Some(g) => g,
+            None => return Err(format!("Could not find group at {:?}", from)),
         };
 
         let mut relocated_node = source_group.remove_node(&node_uuid)?;
@@ -578,10 +577,9 @@ impl Database {
             Node::Entry(ref mut e) => e.times.set_location_changed(new_location_changed_timestamp),
         };
 
-        // FIXME we can use find_group_mut here.
-        let destination_group = match self.root.find_mut(&to).unwrap() {
-            NodeRefMut::Group(g) => g,
-            NodeRefMut::Entry(_) => panic!("".to_string()),
+        let destination_group = match self.root.find_group_mut(&to) {
+            Some(g) => g,
+            None => return Err(format!("Could not find group at {:?}", to)),
         };
         destination_group.children.push(relocated_node);
         Ok(())
