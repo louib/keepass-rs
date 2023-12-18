@@ -482,56 +482,53 @@ impl Database {
             if let Some(destination_group_location) = destination_group_location {
                 // The group already exists and is at the right location, so we can proceed and merge
                 // the two groups.
-                if current_group_path == destination_group_location {
-                    let new_merge_log = self.merge_group(new_group_location, other_group)?;
-                    log.append(&new_merge_log);
-                    continue;
-                }
+                if current_group_path != destination_group_location {
+                    let mut existing_group_location = destination_group_location.clone();
+                    existing_group_location.push(other_group_uuid);
 
-                let mut existing_group_location = destination_group_location.clone();
-                existing_group_location.push(other_group_uuid);
+                    // The group already exists but is not at the right location. We might have to
+                    // relocate it.
+                    let existing_group = self.root.find_group(&existing_group_location).unwrap();
+                    let existing_group_location_changed =
+                        match existing_group.times.get_location_changed() {
+                            Some(t) => *t,
+                            None => {
+                                log.warnings.push(format!(
+                                    "Entry {} did not have a location changed timestamp",
+                                    existing_group.uuid
+                                ));
+                                Times::now()
+                            }
+                        };
+                    let other_group_location_changed =
+                        match other_group.times.get_location_changed() {
+                            Some(t) => *t,
+                            None => {
+                                log.warnings.push(format!(
+                                    "Entry {} did not have a location changed timestamp",
+                                    other_group.uuid
+                                ));
+                                Times::epoch()
+                            }
+                        };
+                    // The other group was moved after the current group, so we have to relocate it.
+                    if existing_group_location_changed < other_group_location_changed {
+                        self.relocate_node(
+                            &other_group.uuid,
+                            &destination_group_location,
+                            &current_group_path,
+                            other_group_location_changed,
+                        )?;
 
-                // The group already exists but is not at the right location. We might have to
-                // relocate it.
-                let existing_group = self.root.find_group(&existing_group_location).unwrap();
-                let existing_group_location_changed =
-                    match existing_group.times.get_location_changed() {
-                        Some(t) => *t,
-                        None => {
-                            log.warnings.push(format!(
-                                "Entry {} did not have a location changed timestamp",
-                                existing_group.uuid
-                            ));
-                            Times::now()
-                        }
-                    };
-                let other_group_location_changed = match other_group.times.get_location_changed() {
-                    Some(t) => *t,
-                    None => {
-                        log.warnings.push(format!(
-                            "Entry {} did not have a location changed timestamp",
-                            other_group.uuid
-                        ));
-                        Times::epoch()
+                        log.events.push(MergeEvent {
+                            event_type: MergeEventType::GroupLocationUpdated,
+                            node_uuid: other_group.uuid,
+                        });
+
+                        let new_merge_log = self.merge_group(new_group_location, other_group)?;
+                        log.append(&new_merge_log);
+                        continue;
                     }
-                };
-                // The other group was moved after the current group, so we have to relocate it.
-                if existing_group_location_changed < other_group_location_changed {
-                    self.relocate_node(
-                        &other_group.uuid,
-                        &destination_group_location,
-                        &current_group_path,
-                        other_group_location_changed,
-                    )?;
-
-                    log.events.push(MergeEvent {
-                        event_type: MergeEventType::GroupLocationUpdated,
-                        node_uuid: other_group.uuid,
-                    });
-
-                    let new_merge_log = self.merge_group(new_group_location, other_group)?;
-                    log.append(&new_merge_log);
-                    continue;
                 }
 
                 let new_merge_log = self.merge_group(new_group_location, other_group)?;
