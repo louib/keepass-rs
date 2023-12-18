@@ -293,7 +293,7 @@ impl Database {
             if group_last_modification < deleted_object.deletion_time {
                 parent_group.remove_node(&deleted_object.uuid)?;
                 log.events.push(MergeEvent {
-                    event_type: MergeEventType::EntryDeleted,
+                    event_type: MergeEventType::GroupDeleted,
                     node_uuid: deleted_object.uuid,
                 });
 

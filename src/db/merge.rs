@@ -8,6 +8,7 @@ pub enum MergeEventType {
     EntryUpdated,
 
     GroupCreated,
+    GroupDeleted,
     GroupLocationUpdated,
     GroupUpdated,
 }
