@@ -107,11 +107,12 @@ impl Entry {
 
     // Convenience function used in when merging two entries
     pub(crate) fn has_diverged_from(&self, other_entry: &Entry) -> bool {
+        let mut new_times = Times::default();
         let mut self_without_times = self.clone();
-        self_without_times.times = Times::new();
+        self_without_times.times = new_times.clone();
         let mut other_without_times = other_entry.clone();
-        other_without_times.times = Times::new();
-        !self_without_times.eq(other_entry)
+        other_without_times.times = new_times.clone();
+        !self_without_times.eq(&other_without_times)
     }
 }
 
@@ -220,16 +221,13 @@ impl<'a> Entry {
                 return true;
             }
 
+            let mut new_times = Times::default();
             let mut sanitized_entry = self.clone();
-            sanitized_entry
-                .times
-                .set_last_modification(NaiveDateTime::default());
+            sanitized_entry.times = new_times.clone();
             sanitized_entry.history.take();
 
             let mut last_history_entry = history.entries.get(0).unwrap().clone();
-            last_history_entry
-                .times
-                .set_last_modification(NaiveDateTime::default());
+            last_history_entry.times = new_times.clone();
             last_history_entry.history.take();
 
             if sanitized_entry.eq(&last_history_entry) {
@@ -351,7 +349,7 @@ impl History {
             let modification_time = history_entry.times.get_last_modification().unwrap();
             let existing_history_entry = new_history_entries.get(modification_time);
             if let Some(existing_history_entry) = existing_history_entry {
-                if !existing_history_entry.eq(&history_entry) {
+                if existing_history_entry.has_diverged_from(&history_entry) {
                     log.warnings.push(format!(
                         "History entries for {} have the same modification timestamp but were not the same.",
                         existing_history_entry.uuid

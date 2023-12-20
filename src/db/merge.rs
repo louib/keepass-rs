@@ -763,6 +763,77 @@ mod merge_tests {
     }
 
     #[test]
+    fn test_entry_relocation_and_update() {
+        let mut destination_db = create_test_database();
+        let mut source_db = destination_db.clone();
+
+        let group_count_before = get_all_groups(&destination_db.root).len();
+        let entry_count_before = get_all_entries(&destination_db.root).len();
+
+        let entry2 = source_db
+            .root
+            .find_entry_mut(&vec![
+                Uuid::parse_str(GROUP1_ID).unwrap(),
+                Uuid::parse_str(SUBGROUP1_ID).unwrap(),
+                Uuid::parse_str(ENTRY2_ID).unwrap(),
+            ])
+            .unwrap();
+        entry2.set_field_and_commit("Title", "entry2_modified_in_source");
+
+        thread::sleep(time::Duration::from_secs(1));
+        let new_location_changed_timestamp = Times::now();
+        source_db
+            .relocate_node(
+                &Uuid::parse_str(ENTRY2_ID).unwrap(),
+                &vec![
+                    Uuid::parse_str(GROUP1_ID).unwrap(),
+                    Uuid::parse_str(SUBGROUP1_ID).unwrap(),
+                ],
+                &vec![Uuid::parse_str(GROUP2_ID).unwrap()],
+                new_location_changed_timestamp,
+            )
+            .unwrap();
+
+        let entry2 = destination_db
+            .root
+            .find_entry_mut(&vec![
+                Uuid::parse_str(GROUP1_ID).unwrap(),
+                Uuid::parse_str(SUBGROUP1_ID).unwrap(),
+                Uuid::parse_str(ENTRY2_ID).unwrap(),
+            ])
+            .unwrap();
+        entry2.set_field_and_commit("Title", "entry2_modified_in_destination");
+        let entry_modified_timestamp = entry2.times.get_last_modification().unwrap().clone();
+
+        let merge_result = destination_db.merge(&source_db).unwrap();
+        assert_eq!(merge_result.warnings.len(), 0);
+        assert_eq!(merge_result.events.len(), 2);
+
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        assert_eq!(group_count_after, group_count_before);
+        assert_eq!(entry_count_after, entry_count_before);
+
+        let moved_entry_location = destination_db
+            .root
+            .find_node_location(Uuid::parse_str(ENTRY2_ID).unwrap())
+            .unwrap();
+        assert_eq!(moved_entry_location.len(), 2);
+        assert_eq!(&moved_entry_location[0].to_string(), ROOT_GROUP_ID);
+        assert_eq!(&moved_entry_location[1].to_string(), GROUP2_ID);
+
+        let moved_entry = get_entry(&destination_db, &["group2", "entry2_modified_in_destination"]);
+        assert_eq!(
+            *moved_entry.times.get_last_modification().unwrap(),
+            entry_modified_timestamp,
+        );
+        assert_eq!(
+            *moved_entry.times.get_location_changed().unwrap(),
+            new_location_changed_timestamp
+        );
+    }
+
+    #[test]
     fn test_entry_relocation_new_group() {
         let mut destination_db = create_test_database();
 

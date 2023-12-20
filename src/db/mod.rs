@@ -374,10 +374,14 @@ impl Database {
                             &current_group_path,
                             source_location_changed_time,
                         )?;
+                        // Update the location of the current entry in case we have to update it
+                        // after.
+                        existing_entry_location = current_group_path.clone();
+                        existing_entry_location.push(other_entry.uuid);
                     }
                 }
 
-                if existing_entry == **other_entry {
+                if !existing_entry.has_diverged_from(other_entry) {
                     continue;
                 }
                 // The entry already exists and is at the right location, so we can proceed and merge
@@ -427,7 +431,10 @@ impl Database {
                     continue;
                 }
 
-                let mut existing_entry = self.root.find_entry_mut(&existing_entry_location).unwrap();
+                let mut existing_entry = match self.root.find_entry_mut(&existing_entry_location) {
+                    Some(e) => e,
+                    None => return Err(format!("Could not find entry at {:?}", existing_entry_location)),
+                };
                 *existing_entry = merged_entry.clone();
 
                 log.events.push(MergeEvent {
