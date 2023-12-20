@@ -338,7 +338,7 @@ impl Database {
 
                 // The entry already exists but is not at the right location. We might have to
                 // relocate it.
-                let existing_entry = self.root.find_entry(&existing_entry_location).unwrap().clone();
+                let mut existing_entry = self.root.find_entry(&existing_entry_location).unwrap().clone();
 
                 // The entry already exists but is not at the right location. We might have to
                 // relocate it.
@@ -378,6 +378,9 @@ impl Database {
                         // after.
                         existing_entry_location = current_group_path.clone();
                         existing_entry_location.push(other_entry.uuid);
+                        existing_entry
+                            .times
+                            .set_location_changed(source_location_changed_time);
                     }
                 }
 
