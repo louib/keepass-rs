@@ -27,7 +27,7 @@ pub use crate::db::{
 };
 
 #[cfg(feature = "merge")]
-use crate::db::merge::{MergeEvent, MergeEventType, MergeLog};
+use crate::db::merge::{MergeError, MergeEvent, MergeEventType, MergeLog};
 
 #[cfg(feature = "totp")]
 pub use crate::db::otp::{TOTPAlgorithm, TOTP};
@@ -143,7 +143,7 @@ impl Database {
     /// This function will use the UUIDs to detect that entries and groups are
     /// the same.
     #[cfg(feature = "merge")]
-    pub fn merge(&mut self, other: &Database) -> Result<MergeLog, String> {
+    pub fn merge(&mut self, other: &Database) -> Result<MergeLog, MergeError> {
         let mut log = MergeLog::default();
         log.append(&self.merge_group(vec![], &other.root, false)?);
         log.append(&self.merge_deletions(&other)?);
@@ -151,7 +151,7 @@ impl Database {
     }
 
     #[cfg(feature = "merge")]
-    fn merge_deletions(&mut self, other: &Database) -> Result<MergeLog, String> {
+    fn merge_deletions(&mut self, other: &Database) -> Result<MergeLog, MergeError> {
         // Utility function to search for a UUID in the VecDeque of deleted objects.
         let is_in_deleted_queue = |uuid: Uuid, deleted_groups_queue: &VecDeque<DeletedObject>| -> bool {
             for deleted_object in deleted_groups_queue {
@@ -179,7 +179,7 @@ impl Database {
 
             let mut parent_group = match self.root.find_group_mut(&entry_location) {
                 Some(g) => g,
-                None => return Err(format!("Expected a group at {:?}", &entry_location)),
+                None => return Err(MergeError::FindGroupError(entry_location)),
             };
 
             let entry = match parent_group.find_entry(&vec![deleted_object.uuid]) {
@@ -230,7 +230,7 @@ impl Database {
 
             let mut parent_group = match self.root.find_group_mut(&group_location) {
                 Some(g) => g,
-                None => return Err(format!("Expected to find group at {:?}", &group_location)),
+                None => return Err(MergeError::FindGroupError(group_location)),
             };
 
             let group = match parent_group.find_group(&vec![deleted_object.uuid]) {
@@ -319,7 +319,7 @@ impl Database {
         current_group_path: NodeLocation,
         current_group: &Group,
         is_in_deleted_group: bool,
-    ) -> Result<MergeLog, String> {
+    ) -> Result<MergeLog, MergeError> {
         let mut log = MergeLog::default();
 
         if let Some(destination_group) = self.root.find_group_mut(&current_group_path) {
@@ -416,7 +416,9 @@ impl Database {
                         // This should never happen.
                         // This means that an entry was updated without updating the last modification
                         // timestamp.
-                        return Err("Entries have the same modification time but are not the same!".to_string());
+                        return Err(MergeError::EntryModificationTimeNotUpdated(
+                            other_entry.uuid.to_string(),
+                        ));
                     }
                     continue;
                 }
@@ -436,7 +438,7 @@ impl Database {
 
                 let mut existing_entry = match self.root.find_entry_mut(&existing_entry_location) {
                     Some(e) => e,
-                    None => return Err(format!("Could not find entry at {:?}", existing_entry_location)),
+                    None => return Err(MergeError::FindEntryError(existing_entry_location)),
                 };
                 *existing_entry = merged_entry.clone();
 
@@ -462,7 +464,7 @@ impl Database {
 
             let mut new_entry_parent_group = match self.root.find_group_mut(&current_group_path) {
                 Some(g) => g,
-                None => return Err(format!("Could not find group {:?}", current_group_path)),
+                None => return Err(MergeError::FindGroupError(current_group_path)),
             };
             new_entry_parent_group.add_child(new_entry.clone());
 
@@ -552,7 +554,7 @@ impl Database {
             });
             let mut new_group_parent_group = match self.root.find_group_mut(&current_group_path) {
                 Some(g) => g,
-                None => return Err(format!("Could not find group at {:?}", current_group_path)),
+                None => return Err(MergeError::FindGroupError(current_group_path)),
             };
             new_group_parent_group.add_child(new_group.clone());
 
@@ -569,10 +571,10 @@ impl Database {
         from: &NodeLocation,
         to: &NodeLocation,
         new_location_changed_timestamp: NaiveDateTime,
-    ) -> Result<(), String> {
+    ) -> Result<(), MergeError> {
         let source_group = match self.root.find_group_mut(&from) {
             Some(g) => g,
-            None => return Err(format!("Could not find group at {:?}", from)),
+            None => return Err(MergeError::FindGroupError(from.to_vec())),
         };
 
         let mut relocated_node = source_group.remove_node(&node_uuid)?;
@@ -583,7 +585,7 @@ impl Database {
 
         let destination_group = match self.root.find_group_mut(&to) {
             Some(g) => g,
-            None => return Err(format!("Could not find group at {:?}", to)),
+            None => return Err(MergeError::FindGroupError(to.to_vec())),
         };
         destination_group.children.push(relocated_node);
         Ok(())

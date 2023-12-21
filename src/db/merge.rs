@@ -1,3 +1,5 @@
+use crate::db::NodeLocation;
+use thiserror::Error;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -26,6 +28,29 @@ pub struct MergeEvent {
 pub struct MergeLog {
     pub warnings: Vec<String>,
     pub events: Vec<MergeEvent>,
+}
+
+/// Errors while merge two databases
+#[derive(Error)]
+#[derive(Debug)]
+pub enum MergeError {
+    #[error("{0}")]
+    GenericError(String),
+
+    #[error("Could not find group at {0:?}")]
+    FindGroupError(NodeLocation),
+
+    #[error("Could not find entry at {0:?}")]
+    FindEntryError(NodeLocation),
+
+    #[error("Entries with UUID {0} have the same modification time but have diverged.")]
+    EntryModificationTimeNotUpdated(String),
+
+    #[error("Groups with UUID {0} have the same modification time but have diverged.")]
+    GroupModificationTimeNotUpdated(String),
+
+    #[error("Found history entries with the same timestamp ({0}) for entry {1}.")]
+    DuplicateHistoryEntries(String, String),
 }
 
 impl MergeLog {

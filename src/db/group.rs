@@ -9,7 +9,7 @@ use crate::db::{
 };
 
 #[cfg(feature = "merge")]
-use crate::db::merge::{MergeEvent, MergeEventType, MergeLog};
+use crate::db::merge::{MergeError, MergeEvent, MergeEventType, MergeLog};
 
 pub(crate) type NodeLocation = Vec<Uuid>;
 
@@ -275,7 +275,7 @@ impl Group {
         response
     }
 
-    pub(crate) fn remove_node(&mut self, uuid: &Uuid) -> Result<Node, String> {
+    pub(crate) fn remove_node(&mut self, uuid: &Uuid) -> Result<Node, MergeError> {
         let mut removed_node: Option<Node> = None;
         let mut new_nodes: Vec<Node> = vec![];
         for node in &self.children {
@@ -302,7 +302,10 @@ impl Group {
             return Ok(node);
         }
 
-        return Err(format!("Could not find node {} in group {}.", uuid, self.name));
+        return Err(MergeError::GenericError(format!(
+            "Could not find node {} in group {}.",
+            uuid, self.name
+        )));
     }
 
     pub(crate) fn find_node_location(&self, id: Uuid) -> Option<NodeLocation> {
@@ -329,7 +332,7 @@ impl Group {
     }
 
     #[cfg(feature = "merge")]
-    pub(crate) fn merge_with(&mut self, other: &Group) -> Result<MergeLog, String> {
+    pub(crate) fn merge_with(&mut self, other: &Group) -> Result<MergeLog, MergeError> {
         let mut log = MergeLog::default();
 
         let source_last_modification = match other.times.get_last_modification() {
@@ -358,7 +361,9 @@ impl Group {
                 // This should never happen.
                 // This means that an entry was updated without updating the last modification
                 // timestamp.
-                return Err("Groups have the same modification time but are not the same!".to_string());
+                return Err(MergeError::GroupModificationTimeNotUpdated(
+                    other.uuid.to_string(),
+                ));
             }
             return Ok(log);
         }

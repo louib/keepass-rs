@@ -6,7 +6,7 @@ use secstr::SecStr;
 use uuid::Uuid;
 
 #[cfg(feature = "merge")]
-use crate::db::merge::MergeLog;
+use crate::db::merge::{MergeError, MergeLog};
 
 use crate::db::{Color, CustomData, Times};
 
@@ -47,7 +47,7 @@ impl Entry {
     }
 
     #[cfg(feature = "merge")]
-    pub(crate) fn merge(&self, other: &Entry) -> Result<(Entry, MergeLog), String> {
+    pub(crate) fn merge(&self, other: &Entry) -> Result<(Entry, MergeLog), MergeError> {
         let mut log = MergeLog::default();
 
         let mut source_history = match &other.history {
@@ -330,16 +330,16 @@ impl History {
 
     // Merge both histories together.
     #[cfg(feature = "merge")]
-    pub(crate) fn merge_with(&mut self, other: &History) -> Result<MergeLog, String> {
+    pub(crate) fn merge_with(&mut self, other: &History) -> Result<MergeLog, MergeError> {
         let mut log = MergeLog::default();
         let mut new_history_entries: HashMap<NaiveDateTime, Entry> = HashMap::new();
 
         for history_entry in &self.entries {
             let modification_time = history_entry.times.get_last_modification().unwrap();
             if new_history_entries.contains_key(modification_time) {
-                return Err(format!(
-                    "Found history entries with the same timestamp ({}) for entry {}.",
-                    modification_time, history_entry.uuid,
+                return Err(MergeError::DuplicateHistoryEntries(
+                    modification_time.to_string(),
+                    history_entry.uuid.to_string(),
                 ));
             }
             new_history_entries.insert(modification_time.clone(), history_entry.clone());
@@ -370,8 +370,10 @@ impl History {
 
         self.entries = new_entries;
         if !self.is_ordered() {
-            // TODO this should be unit tested.
-            return Err("The resulting history is not ordered.".to_string());
+            // TODO this should a unit test instead.
+            return Err(MergeError::GenericError(
+                "The resulting history is not ordered.".to_string(),
+            ));
         }
 
         Ok(log)
