@@ -962,6 +962,13 @@ mod merge_tests {
         assert_eq!(merge_result.warnings.len(), 0);
         assert_eq!(merge_result.events.len(), 0);
 
+        let mut entry = &mut destination_db.root.entries()[0];
+        let merged_history = entry.history.clone().unwrap();
+        assert!(merged_history.is_ordered());
+        assert_eq!(merged_history.entries.len(), 2);
+        let merged_entry = &merged_history.entries[1];
+        assert_eq!(merged_entry.get_title(), Some("entry1"));
+
         let entry_count_after = get_all_entries(&destination_db.root).len();
         let group_count_after = get_all_groups(&destination_db.root).len();
         assert_eq!(entry_count_after, entry_count_before);
@@ -985,6 +992,13 @@ mod merge_tests {
         let merge_result = destination_db.merge(&source_db).unwrap();
         assert_eq!(merge_result.warnings.len(), 0);
         assert_eq!(merge_result.events.len(), 1);
+
+        let mut entry = &mut destination_db.root.entries()[0];
+        let merged_history = entry.history.clone().unwrap();
+        assert!(merged_history.is_ordered());
+        assert_eq!(merged_history.entries.len(), 2);
+        let merged_entry = &merged_history.entries[1];
+        assert_eq!(merged_entry.get_title(), Some("entry1"));
 
         let entry_count_after = get_all_entries(&destination_db.root).len();
         let group_count_after = get_all_groups(&destination_db.root).len();

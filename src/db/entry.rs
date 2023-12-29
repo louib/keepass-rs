@@ -369,13 +369,6 @@ impl History {
         }
 
         self.entries = new_entries;
-        if !self.is_ordered() {
-            // TODO this should a unit test instead.
-            return Err(MergeError::GenericError(
-                "The resulting history is not ordered.".to_string(),
-            ));
-        }
-
         Ok(log)
     }
 }
