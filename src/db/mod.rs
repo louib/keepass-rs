@@ -393,50 +393,14 @@ impl Database {
                 if !existing_entry.has_diverged_from(other_entry) {
                     continue;
                 }
+
                 // The entry already exists and is at the right location, so we can proceed and merge
-                // the two groups.
-
-                let source_last_modification = match other_entry.times.get_last_modification() {
-                    Some(t) => *t,
-                    None => {
-                        log.warnings.push(format!(
-                            "Entry {} did not have a last modification timestamp",
-                            other_entry.uuid
-                        ));
-                        Times::epoch()
-                    }
+                // the two entries.
+                let (merged_entry, entry_merge_log) = existing_entry.merge(other_entry)?;
+                let merged_entry = match merged_entry {
+                    Some(m) => m,
+                    None => continue,
                 };
-                let destination_last_modification = match existing_entry.times.get_last_modification() {
-                    Some(t) => *t,
-                    None => {
-                        log.warnings.push(format!(
-                            "Entry {} did not have a last modification timestamp",
-                            other_entry.uuid
-                        ));
-                        Times::now()
-                    }
-                };
-
-                if destination_last_modification == source_last_modification {
-                    if !existing_entry.has_diverged_from(&other_entry) {
-                        // This should never happen.
-                        // This means that an entry was updated without updating the last modification
-                        // timestamp.
-                        return Err(MergeError::EntryModificationTimeNotUpdated(
-                            other_entry.uuid.to_string(),
-                        ));
-                    }
-                    continue;
-                }
-
-                let mut merged_entry: Entry = Entry::default();
-                let mut entry_merge_log: MergeLog = MergeLog::default();
-
-                if destination_last_modification > source_last_modification {
-                    (merged_entry, entry_merge_log) = existing_entry.merge(other_entry)?;
-                } else {
-                    (merged_entry, entry_merge_log) = other_entry.clone().merge(&existing_entry)?;
-                }
 
                 if existing_entry.eq(&merged_entry) {
                     continue;

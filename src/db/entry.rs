@@ -47,7 +47,63 @@ impl Entry {
     }
 
     #[cfg(feature = "merge")]
-    pub(crate) fn merge(&self, other: &Entry) -> Result<(Entry, MergeLog), MergeError> {
+    pub(crate) fn merge(&self, other: &Entry) -> Result<(Option<Entry>, MergeLog), MergeError> {
+        let mut log = MergeLog::default();
+
+        let source_last_modification = match other.times.get_last_modification() {
+            Some(t) => *t,
+            None => {
+                log.warnings.push(format!(
+                    "Entry {} did not have a last modification timestamp",
+                    other.uuid
+                ));
+                Times::epoch()
+            }
+        };
+        let destination_last_modification = match self.times.get_last_modification() {
+            Some(t) => *t,
+            None => {
+                log.warnings.push(format!(
+                    "Entry {} did not have a last modification timestamp",
+                    self.uuid
+                ));
+                Times::now()
+            }
+        };
+
+        if destination_last_modification == source_last_modification {
+            if !self.has_diverged_from(&other) {
+                // This should never happen.
+                // This means that an entry was updated without updating the last modification
+                // timestamp.
+                return Err(MergeError::EntryModificationTimeNotUpdated(
+                    other.uuid.to_string(),
+                ));
+            }
+            return Ok((None, log));
+        }
+
+        let mut merged_entry: Entry = Entry::default();
+        let mut entry_merge_log: MergeLog = MergeLog::default();
+
+        if destination_last_modification > source_last_modification {
+            (merged_entry, entry_merge_log) = self.merge_history(other)?;
+        } else {
+            (merged_entry, entry_merge_log) = other.clone().merge_history(&self)?;
+        }
+
+        // The location changed timestamp is handled separately when merging two databases.
+        if let Some(location_changed_timestamp) = self.times.get_location_changed() {
+            merged_entry
+                .times
+                .set_location_changed(*location_changed_timestamp);
+        }
+
+        return Ok((Some(merged_entry), entry_merge_log));
+    }
+
+    #[cfg(feature = "merge")]
+    pub(crate) fn merge_history(&self, other: &Entry) -> Result<(Entry, MergeLog), MergeError> {
         let mut log = MergeLog::default();
 
         let mut source_history = match &other.history {
