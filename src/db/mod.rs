@@ -322,7 +322,13 @@ impl Database {
     ) -> Result<MergeLog, MergeError> {
         let mut log = MergeLog::default();
 
-        if let Some(destination_group) = self.root.find_group_mut(&current_group_path) {
+        if let Some(destination_group_location) = self.find_node_location(current_group.uuid) {
+            let mut destination_group_path = destination_group_location.clone();
+            destination_group_path.push(current_group.uuid);
+            let destination_group = match self.root.find_group_mut(&destination_group_path) {
+                Some(g) => g,
+                None => return Err(MergeError::FindGroupError(destination_group_path)),
+            };
             let group_update_merge_events = destination_group.merge_with(&current_group)?;
             log.append(&group_update_merge_events);
         }
@@ -490,8 +496,6 @@ impl Database {
 
             // The group already exists in the destination database.
             if let Some(destination_group_location) = destination_group_location {
-                // The group already exists and is at the right location, so we can proceed and merge
-                // the two groups.
                 if current_group_path != destination_group_location {
                     let mut existing_group_location = destination_group_location.clone();
                     existing_group_location.push(other_group_uuid);
@@ -540,6 +544,8 @@ impl Database {
                     }
                 }
 
+                // The group already exists and is at the right location, so we can proceed and merge
+                // the two groups.
                 let new_merge_log = self.merge_group(new_group_location, other_group, is_in_deleted_group)?;
                 log.append(&new_merge_log);
                 continue;

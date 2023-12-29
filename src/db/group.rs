@@ -359,7 +359,7 @@ impl Group {
         if destination_last_modification == source_last_modification {
             if self.has_diverged_from(&other) {
                 // This should never happen.
-                // This means that an entry was updated without updating the last modification
+                // This means that a group was updated without updating the last modification
                 // timestamp.
                 return Err(MergeError::GroupModificationTimeNotUpdated(
                     other.uuid.to_string(),
@@ -377,7 +377,14 @@ impl Group {
         self.icon_id = other.icon_id.clone();
         self.custom_icon_uuid = other.custom_icon_uuid.clone();
         self.custom_data = other.custom_data.clone();
+
+        // The location changed timestamp is handled separately when merging two databases.
+        let current_times = self.times.clone();
         self.times = other.times.clone();
+        if let Some(t) = current_times.get_location_changed() {
+            self.times.set_location_changed(t.clone());
+        }
+
         self.is_expanded = other.is_expanded;
         self.default_autotype_sequence = other.default_autotype_sequence.clone();
         self.enable_autotype = other.enable_autotype.clone();

@@ -1154,4 +1154,52 @@ mod merge_tests {
             Some(new_modification_timestamp).as_ref(),
         );
     }
+
+    #[test]
+    fn test_group_update_in_destination_and_relocation_in_source() {
+        let mut destination_db = create_test_database();
+        let mut source_db = destination_db.clone();
+
+        let entry_count_before = get_all_entries(&destination_db.root).len();
+        let group_count_before = get_all_groups(&destination_db.root).len();
+
+        let mut group = get_group_mut(&mut source_db, &["group1", "subgroup1"]);
+        group.name = "subgroup1_updated_name".to_string();
+        // Making sure to wait 1 sec before update the timestamp, to make
+        // sure that we get a different modification timestamp.
+        thread::sleep(time::Duration::from_secs(1));
+        let new_modification_timestamp = Times::now();
+        group.times.set_last_modification(new_modification_timestamp);
+
+        thread::sleep(time::Duration::from_secs(1));
+        let new_location_changed_timestamp = Times::now();
+        destination_db
+            .relocate_node(
+                &Uuid::parse_str(SUBGROUP1_ID).unwrap(),
+                &vec![Uuid::parse_str(GROUP1_ID).unwrap()],
+                &vec![Uuid::parse_str(GROUP2_ID).unwrap()],
+                new_location_changed_timestamp,
+            )
+            .unwrap();
+
+        let merge_result = destination_db.merge(&source_db).unwrap();
+        assert_eq!(merge_result.warnings.len(), 0);
+        assert_eq!(merge_result.events.len(), 1);
+
+        let entry_count_after = get_all_entries(&destination_db.root).len();
+        let group_count_after = get_all_groups(&destination_db.root).len();
+        assert_eq!(entry_count_after, entry_count_before);
+        assert_eq!(group_count_after, group_count_before);
+
+        let mut modified_group = get_group(&mut destination_db, &["group2", "subgroup1_updated_name"]);
+        assert_eq!(modified_group.name, "subgroup1_updated_name");
+        assert_eq!(
+            modified_group.times.get_last_modification(),
+            Some(new_modification_timestamp).as_ref(),
+        );
+        assert_eq!(
+            modified_group.times.get_location_changed(),
+            Some(new_location_changed_timestamp).as_ref(),
+        );
+    }
 }
